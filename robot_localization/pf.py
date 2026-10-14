@@ -16,9 +16,11 @@ import math
 import time
 import numpy as np
 from occupancy_field import OccupancyField
-from helper_functions import TFHelper
+from helper_functions import TFHelper, draw_random_sample
 from rclpy.qos import qos_profile_sensor_data
 from angle_helpers import quaternion_from_euler
+import random
+from scipy.stats import truncnorm
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -99,7 +101,7 @@ class ParticleFilter(Node):
         # this is the current scan that our run_loop should process
         self.scan_to_process = None
         # your particle cloud will go here
-        self.particle_cloud = []
+        self.particle_cloud: list[Particle] = []
 
         self.current_odom_xy_theta = []
         self.occupancy_field = OccupancyField(self)
@@ -211,8 +213,13 @@ class ParticleFilter(Node):
         else:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
-
-        # TODO: modify particles using delta
+        
+        for p in self.particle_cloud:
+            dT = old_odom_xy_theta[2] - p.theta
+            new_x = p.x + (delta[0]*math.cos(dT) + delta[1]*math.sin(dT))
+            new_y = p.y + (-delta[0]*math.sin(dT) + delta[1]*math.cos(dT))
+            new_t = p.theta + delta[3]
+            p.x, p.y, p.theta = new_x, new_y, new_t
 
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
@@ -222,7 +229,19 @@ class ParticleFilter(Node):
         """
         # make sure the distribution is normalized
         self.normalize_particles()
-        # TODO: fill out the rest of the implementation
+        prob_list = [p.w for p in self.particle_cloud]
+        n_particle_uniform = 50
+        particles: list[Particle] = draw_random_sample(self.particle_cloud, prob_list, self.n_particles-n_particle_uniform)
+        sd = 0.2 # noise level
+        theta_spread = 4;
+        bounds = OccupancyField.get_obstacle_bounding_box()
+        for p in particles:
+            noise_x = random.uniform(bounds[0][0], bounds[0][1])
+            noise_y = random.uniform(bounds[1][0], bounds[1][1])
+            t_val = random.vonmisesvariate(p.theta, theta_spread)
+            p.x, p.y, p.theta = p.x+noise_x, p.y+noise_y, t_val
+        self.particle_cloud = particles
+        
 
     def update_particles_with_laser(self, r, theta):
         """ Updates the particle weights in response to the scan data
@@ -246,7 +265,18 @@ class ParticleFilter(Node):
         if xy_theta is None:
             xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
         self.particle_cloud = []
-        # TODO create particles
+        bounds = self.occupancy_field.get_obstacle_bounding_box()
+        x_div = 2 #kinda just a magic number should be tweaked 
+        y_div = 2 #kinda just a magic number should be tweaked 
+        x_min_max = ((bounds[0][0] - xy_theta[0])/x_div, (bounds[0][1] - xy_theta[0])/x_div);
+        y_min_max = ((bounds[1][0] - xy_theta[1])/y_div, (bounds[1][1] - xy_theta[1])/y_div);
+        theta_div = 4 #kinda just a magic number should be tweaked 
+        for i in range(self.n_particles):
+            x = truncnorm.rvs(x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div);
+            y = truncnorm.rvs(y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div);
+            t = random.vonmisesvariate(xy_theta[2], theta_div)
+            p = Particle(x = x, y = y, theta = t)
+            self.particle_cloud.append(p)
 
         self.normalize_particles()
         self.update_robot_pose()
