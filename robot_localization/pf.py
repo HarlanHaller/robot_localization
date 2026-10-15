@@ -250,13 +250,18 @@ class ParticleFilter(Node):
         n_particle_uniform = 50
         particles: list[Particle] = draw_random_sample(self.particle_cloud, prob_list, self.n_particles-n_particle_uniform)
         sd = 0.2 # noise level
-        theta_spread = 4
+        theta_spread = 4;
         bounds = OccupancyField.get_obstacle_bounding_box()
         for p in particles:
-            noise_x = random.uniform(bounds[0][0], bounds[0][1])
-            noise_y = random.uniform(bounds[1][0], bounds[1][1])
+            noise_xy = random.gauss(0, sd)
             t_val = random.vonmisesvariate(p.theta, theta_spread)
-            p.x, p.y, p.theta = p.x+noise_x, p.y+noise_y, t_val
+            p.x, p.y, p.theta = p.x+noise_xy, p.y+noise_xy, t_val
+        for i in range(n_particle_uniform):
+            x_pos = random.uniform(bounds[0][0], bounds[0][1])
+            y_pos = random.uniform(bounds[1][0], bounds[1][1])
+            theta_val = random.unifrom(0, 2*math.pi);
+            p = Particle(x = x_pos, y = y_pos, theta = theta_val)
+            particles.append(p)
         self.particle_cloud = particles
 
     def update_particles_with_laser(self, r, theta):
