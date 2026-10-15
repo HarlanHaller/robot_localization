@@ -186,8 +186,15 @@ class ParticleFilter(Node):
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        # TODO: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
         # just to get started we will fix the robot's pose to always be at the origin
+        best_weight = 0.0
+        best_particle = None
+        for particle in self.particle_cloud:
+            if particle.w > best_weight:
+                best_particle = particle
+        if best_particle is None:
+            print("Can't choose best particle!")
+
         self.robot_pose = Pose()
         if hasattr(self, 'odom_pose'):
             self.transform_helper.fix_map_to_odom_transform(self.robot_pose,
