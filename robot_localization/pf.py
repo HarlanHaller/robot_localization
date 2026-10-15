@@ -270,17 +270,24 @@ class ParticleFilter(Node):
         Each weight is the reciprical of the absoulute value of the
         difference between the shortest measured distance and the
         distance to the closest object to each particle.
+        These weights are then normalized.
         Args:
             r: the distance readings to obstacles
             theta: the angle relative to the robot frame
             for each corresponding reading.
         """
+        # Calculate all the weights
         shortest_measured = min(r)
         for particle in self.particle_cloud:
             shortest_calculated = (
                 self.occupancy_field.get_closest_obstacle_distance(
                 particle.x, particle.y))
-                
+            difference = shortest_measured - shortest_calculated
+            weight = 1 / abs(difference)
+            particle.w = weight
+
+        # Normalize the particle weights
+        self.normalize_particles()
 
     def update_initial_pose(self, msg):
         """ Callback function to handle re-initializing the particle filter based on a pose estimate.
