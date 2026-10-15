@@ -186,7 +186,7 @@ class ParticleFilter(Node):
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        # just to get started we will fix the robot's pose to always be at the origin
+        # Chose the robot's pose based on the pose of the highest weighted particle.
         best_weight = 0.0
         best_particle = None
         for particle in self.particle_cloud:
@@ -195,7 +195,17 @@ class ParticleFilter(Node):
         if best_particle is None:
             print("Can't choose best particle!")
 
+        # Set robot_pose based on the pose of the highest weighted particle.
         self.robot_pose = Pose()
+        self.robot_pose.position.x = best_particle.x
+        self.robot_pose.position.y = best_particle.x
+        quaternion = quaternion_from_euler(0, 0, best_particle.theta)
+        self.robot_pose.orientation.x = quaternion[0]
+        self.robot_pose.orientation.y = quaternion[1]
+        self.robot_pose.orientation.z = quaternion[2]
+        self.robot_pose.orientation.w = quaternion[3]
+
+        # Update the map offset based on robot_pose.
         if hasattr(self, 'odom_pose'):
             self.transform_helper.fix_map_to_odom_transform(self.robot_pose,
                                                             self.odom_pose)
@@ -240,28 +250,32 @@ class ParticleFilter(Node):
         n_particle_uniform = 50
         particles: list[Particle] = draw_random_sample(self.particle_cloud, prob_list, self.n_particles-n_particle_uniform)
         sd = 0.2 # noise level
-        theta_spread = 4;
+        theta_spread = 4
         bounds = OccupancyField.get_obstacle_bounding_box()
         for p in particles:
-            noise_xy = random.gauss(0, sd)
+            noise_x = random.uniform(bounds[0][0], bounds[0][1])
+            noise_y = random.uniform(bounds[1][0], bounds[1][1])
             t_val = random.vonmisesvariate(p.theta, theta_spread)
-            p.x, p.y, p.theta = p.x+noise_xy, p.y+noise_xy, t_val
-        for i in range(n_particle_uniform):
-            x_pos = random.uniform(bounds[0][0], bounds[0][1])
-            y_pos = random.uniform(bounds[1][0], bounds[1][1])
-            theta_val = random.unifrom(0, 2*math.pi);
-            p = Particle(x = x_pos, y = y_pos, theta = theta_val)
-            particles.append(p)
+            p.x, p.y, p.theta = p.x+noise_x, p.y+noise_y, t_val
         self.particle_cloud = particles
-        
 
     def update_particles_with_laser(self, r, theta):
-        """ Updates the particle weights in response to the scan data
-            r: the distance readings to obstacles
-            theta: the angle relative to the robot frame for each corresponding reading 
         """
-        # TODO: implement this
-        pass
+        Updates the particle weights in response to the scan data.
+        Each weight is the reciprical of the absoulute value of the
+        difference between the shortest measured distance and the
+        distance to the closest object to each particle.
+        Args:
+            r: the distance readings to obstacles
+            theta: the angle relative to the robot frame
+            for each corresponding reading.
+        """
+        shortest_measured = min(r)
+        for particle in self.particle_cloud:
+            shortest_calculated = (
+                self.occupancy_field.get_closest_obstacle_distance(
+                particle.x, particle.y))
+                
 
     def update_initial_pose(self, msg):
         """ Callback function to handle re-initializing the particle filter based on a pose estimate.
