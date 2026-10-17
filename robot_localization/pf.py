@@ -248,10 +248,10 @@ class ParticleFilter(Node):
     def update_particles_with_laser(self, r, theta):
         """
         Updates the particle weights in response to the scan data.
-        Each weight is the reciprical of the absoulute value of the
-        difference between the shortest measured distance and the
-        distance to the closest object to each particle.
-        These weights are then normalized.
+        Each weight is higher as the difference between the closest measured
+        distance from the laser scan and the distance from each particle
+        to the nearest object to it.
+
         Args:
             r: the distance readings to obstacles
             theta: the angle relative to the robot frame
@@ -297,7 +297,7 @@ class ParticleFilter(Node):
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
         weight_sum = sum(particle.w for particle in self.particle_cloud)
-        if weight_sum == 1:
+        if abs(weight_sum - 1) < 1e-6:
             return
         for particle in self.particle_cloud:
             particle.w = particle.w / weight_sum

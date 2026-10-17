@@ -5,7 +5,7 @@ from robot_localization.occupancy_field import OccupancyField
 from robot_localization.helper_functions import TFHelper, draw_random_sample
 from robot_localization.angle_helpers import quaternion_from_euler
 import random
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, norm
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, TransformStamped
 from rclpy.parameter import Parameter
@@ -118,21 +118,33 @@ class LogicProvider:
         return particles
 
     def update_particles_with_laser(
-            self, r, theta, particle_cloud: List[Particle]) -> Tuple[List[Particle], int]:
-        # Calculate all the weights
+        self, r, theta, particle_cloud: List[Particle]
+    ) -> Tuple[List[Particle], int]:
+        """
+        Calculate all the weights of particle cloud.
+        """
+        # Calculate the closest distance to the real robot.
         shortest_measured = min(r)
+        # Count how many particles are out of bounds of the map.
         count_OOB = 0
 
+        # For each particle:
         for particle in particle_cloud:
+            # Calculate the distance to the nearest obstacle on the map
             shortest_calculated = (
                 self.occupancy_field.get_closest_obstacle_distance(
                 particle.x, particle.y))
+
+            # If it is outside the bounds of the map:
             if math.isnan(shortest_calculated):
+                # Set the weight to zero.
                 particle.w = 0
                 count_OOB += 1
                 continue
-            difference = shortest_measured - shortest_calculated
-            weight = 1 / abs(difference)
+
+            # Otherwise set the weight based on a normal
+            # distribution around the real closest distance.
+            weight = norm.pdf(shortest_calculated, loc=shortest_measured, scale=1)
             particle.w = weight
 
         return (particle_cloud, count_OOB)
