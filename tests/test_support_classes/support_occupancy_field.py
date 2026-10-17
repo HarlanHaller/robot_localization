@@ -6,6 +6,8 @@ from nav_msgs.srv import GetMap
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import pickle
+import os
+
 
 class OccupancyField(object):
     """ Stores an occupancy field for an input map.  An occupancy field returns
@@ -17,13 +19,14 @@ class OccupancyField(object):
     """
 
     def __init__(self, pickle_path):
+        path = os.path.dirname(os.path.abspath(__file__))
+        abs_pickle_path = os.path.abspath(os.path.join(path, '../', pickle_path))
         data = None
-        with open(pickle_path, "rb") as f:
+        with open(abs_pickle_path, "rb") as f:
             data = pickle.load(f)
-            
-        self.map = data.map
-        self.closest_occ = data.closest_occ
-        self.occupied = data.occupied
+        self.map = data['map']
+        self.closest_occ = data['closest_occ']
+        self.occupied = data['occupied']
 
     def get_obstacle_bounding_box(self):
         """

@@ -1,18 +1,31 @@
-import pytest
-import random
 import math
-from robot_localization.robot_localization.logic_provider import LogicProvider
-from robot_localization.tests.test_support_classes.support_occupancy_field import OccupancyField
-from robot_localization.tests.test_support_classes.support_parameter import Parameter
+import random
+import pytest
+from robot_localization.logic_provider import LogicProvider, Particle
+from test_support_classes.support_occupancy_field import OccupancyField
+from test_support_classes.support_parameter import Parameter
 
 class TestBase:
-    def __init__(self, n_particles = 300, n_particles_uniform = 50):
-        self.occupancy_field = OccupancyField("./mapdata/gauntlet.pkl")
+    def create_logic_provider(self, n_particles = 300, n_particles_uniform = 50):
+        self.occupancy_field = OccupancyField("mapdata/gauntlet.pkl")
         self.n_particles = n_particles
         self.n_particles_uniform_param = Parameter(n_particles_uniform)
         self.logic_provider = LogicProvider(
             self.occupancy_field, self.n_particles, self.n_particles_uniform_param)
 
+
+class TestUpdateWithOdom(TestBase):        
+    def test_move_1(self):
+        self.create_logic_provider()
+        particles = [Particle(x = 1, y = 2, theta=(3 * math.pi / 2))]
+        N_start = (2, 1, math.pi / 2)
+        N_end = (2, 2, math.pi / 6)
+        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        
+        expected_theta = 3 * math.pi / 2 + d_t
+        
+        assert new_particles[0].as_tuple() == pytest.approx((1, 2, expected_theta))
 
 class TestResample(TestBase):
     def __init__(self):
