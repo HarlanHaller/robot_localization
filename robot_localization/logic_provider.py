@@ -1,9 +1,9 @@
 import math
 from typing import List, Tuple
 import numpy as np
-from occupancy_field import OccupancyField
-from helper_functions import TFHelper, draw_random_sample
-from angle_helpers import quaternion_from_euler
+from robot_localization.occupancy_field import OccupancyField
+from robot_localization.helper_functions import TFHelper, draw_random_sample
+from robot_localization.angle_helpers import quaternion_from_euler
 import random
 from scipy.stats import truncnorm
 from std_msgs.msg import Header
@@ -40,6 +40,10 @@ class Particle(object):
         q = quaternion_from_euler(0, 0, self.theta)
         return Pose(position=Point(x=self.x, y=self.y, z=0.0),
                     orientation=Quaternion(x=q[0], y=q[1], z=q[2], w=q[3]))
+        
+    def as_tuple(self):
+        """ A helper function to convert a particle to a (x, y, theta) Tuple"""
+        return(self.x, self.y, self.theta)
 
 
 class LogicProvider:
@@ -91,7 +95,7 @@ class LogicProvider:
         return particle_cloud
 
     def resample_particles(self, particle_cloud: List[Particle]) -> List[Particle]:
-        n_particles_uniform = self.n_particles_uniform_param.get_parameter_value()
+        n_particles_uniform = self.n_particles_uniform_param.value
         prob_list = [p.w for p in particle_cloud]
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
