@@ -197,7 +197,7 @@ class ParticleFilter(Node):
         robot_pose = self.logic_provider.update_robot_pose(self.particle_cloud)
         
         if robot_pose is None:
-            self.get_logger.warn("Can't choose best particle!")
+            self.get_logger().warn("Can't choose best particle!")
             return
         
         self.robot_pose = robot_pose
