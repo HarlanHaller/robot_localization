@@ -5,6 +5,7 @@ import rclpy
 from nav_msgs.srv import GetMap
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+import pickle
 
 class OccupancyField(object):
     """ Stores an occupancy field for an input map.  An occupancy field returns
@@ -15,7 +16,7 @@ class OccupancyField(object):
             the closest obstacle
     """
 
-    def __init__(self, node):
+    def __init__(self, node, gen_pickle = False, map_name=""):
         # grab the map from the map server
         self.cli = node.create_client(GetMap, 'map_server/map')
         while not self.cli.wait_for_service(timeout_sec=1.0):
@@ -68,6 +69,11 @@ class OccupancyField(object):
                 curr += 1
         self.occupied = occupied
         node.get_logger().info("occupancy field ready")
+        
+        if gen_pickle:
+            data = {"map": self.map, "occupied": self.occupied, "closest_occ": self.closest_occ}
+            with open(f"/home/ws/src/robot_localization/tests/mapdata/{map_name}.pkl", "wb") as f:
+                pickle.dump(data, f)
 
     def get_obstacle_bounding_box(self):
         """
