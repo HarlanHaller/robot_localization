@@ -107,9 +107,10 @@ class ParticleFilter(Node):
         self.current_odom_xy_theta = []
         self.occupancy_field = OccupancyField(self)
         self.transform_helper = TFHelper(self)
-        self.logicProvider = LogicProvider(self.occupancy_field, self.n_particles)
         
         self.declare_parameter("n_particles_uniform", 50)
+        
+        self.logic_provider = LogicProvider(self.occupancy_field, self.n_particles, self.get_parameter("n_particles_uniform"))
 
         # we are using a thread to work around single threaded execution bottleneck
         thread = Thread(target=self.loop_wrapper)
@@ -193,7 +194,7 @@ class ParticleFilter(Node):
         self.normalize_particles()
 
         # Chose the robot's pose based on the pose of the highest weighted particle.
-        robot_pose = self.logicProvider.update_robot_pose(self.particle_cloud)
+        robot_pose = self.logic_provider.update_robot_pose(self.particle_cloud)
         
         if robot_pose is None:
             self.get_logger.warn("Can't choose best particle!")
@@ -228,7 +229,7 @@ class ParticleFilter(Node):
             self.current_odom_xy_theta = new_odom_xy_theta
             return
         
-        self.particle_cloud = self.logicProvider.update_particles_with_odom(delta, old_odom_xy_theta, self.particle_cloud)
+        self.particle_cloud = self.logic_provider.update_particles_with_odom(delta, old_odom_xy_theta, self.particle_cloud)
 
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
@@ -240,7 +241,7 @@ class ParticleFilter(Node):
         self.get_logger().info(" --- Resample Particle --- ")
         self.normalize_particles()
         
-        particles = self.logicProvider.resample_particles(self.particle_cloud, self.get_parameter("n_particles_uniform"))
+        particles = self.logic_provider.resample_particles(self.particle_cloud)
             
         self.particle_cloud = particles
 
@@ -258,7 +259,7 @@ class ParticleFilter(Node):
         """
         self.get_logger().info(" --- Update Particle Weights --- ")
         # Calculate all the weights
-        particles, count_OOB = self.logicProvider.update_particles_with_laser(r, theta, self.particle_cloud)
+        particles, count_OOB = self.logic_provider.update_particles_with_laser(r, theta, self.particle_cloud)
         self.particle_cloud = particles
         
         if count_OOB >= 50:
@@ -287,7 +288,7 @@ class ParticleFilter(Node):
             pass
         self.particle_cloud = []
         
-        particles = self.logicProvider.initialize_particle_cloud(timestamp, xy_theta)
+        particles = self.logic_provider.initialize_particle_cloud(timestamp, xy_theta)
         self.particle_cloud = particles
                 
         self.normalize_particles()

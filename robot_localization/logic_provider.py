@@ -8,6 +8,7 @@ import random
 from scipy.stats import truncnorm
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, TransformStamped
+from rclpy.parameter import Parameter
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -37,9 +38,10 @@ class Particle(object):
 
 
 class LogicProvider:
-    def __init__(self, occupancy_field, n_particles):
+    def __init__(self, occupancy_field: OccupancyField, n_particles: int, n_particles_uniform_param: Parameter):
         self.occupancy_field: OccupancyField = occupancy_field
         self.n_particles = n_particles
+        self.n_particles_uniform_param = n_particles_uniform_param
     
     def update_robot_pose(self, particle_cloud: List[Particle]) -> Pose | None:
         best_weight = 0.0
@@ -73,9 +75,10 @@ class LogicProvider:
             p.x, p.y, p.theta = new_x, new_y, new_t
         return particle_cloud
     
-    def resample_particles(self, particle_cloud: List[Particle], n_particle_uniform) -> List[Particle]:
+    def resample_particles(self, particle_cloud: List[Particle]) -> List[Particle]:
+        n_particles_uniform = self.n_particles_uniform_param.get_parameter_value()
         prob_list = [p.w for p in particle_cloud]
-        particles: list[Particle] = draw_random_sample(particle_cloud, prob_list, self.n_particles-n_particle_uniform)
+        particles: list[Particle] = draw_random_sample(particle_cloud, prob_list, self.n_particles-n_particles_uniform)
         sd = 0.2 # noise level
         theta_spread = 4;
         bounds = self.occupancy_field.get_obstacle_bounding_box()
@@ -84,7 +87,7 @@ class LogicProvider:
             noise_xy = random.gauss(0, sd)
             t_val = random.vonmisesvariate(p.theta, theta_spread)
             p.x, p.y, p.theta = p.x+noise_xy, p.y+noise_xy, t_val
-        for i in range(n_particle_uniform):
+        for i in range(n_particles_uniform):
             x_pos = random.uniform(bounds[0][0], bounds[0][1])
             y_pos = random.uniform(bounds[1][0], bounds[1][1])
             theta_val = random.uniform(0, 2*math.pi);
