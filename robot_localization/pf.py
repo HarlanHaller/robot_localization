@@ -6,6 +6,7 @@ import rclpy
 from threading import Thread
 from rclpy.time import Time
 from rclpy.node import Node
+from logic_provider import LogicProvider
 from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
 from nav2_msgs.msg import ParticleCloud, Particle
@@ -73,7 +74,7 @@ class ParticleFilter(Node):
     """
     def __init__(self):
         super().__init__('pf')
-        self.base_frame = "base_footprint"   # the frame of the robot base
+        self.base_frame = "base_link"   # the frame of the robot base
         self.map_frame = "map"          # the name of the map coordinate frame
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
@@ -106,11 +107,15 @@ class ParticleFilter(Node):
         self.current_odom_xy_theta = []
         self.occupancy_field = OccupancyField(self)
         self.transform_helper = TFHelper(self)
+        self.logicProvider = LogicProvider(self.occupancy_field, self.n_particles)
+        
+        self.declare_parameter("n_particles_uniform", 50)
 
         # we are using a thread to work around single threaded execution bottleneck
         thread = Thread(target=self.loop_wrapper)
         thread.start()
         self.transform_update_timer = self.create_timer(0.05, self.pub_latest_transform)
+        
 
     def pub_latest_transform(self):
         """ This function takes care of sending out the map to odom transform """
@@ -149,13 +154,13 @@ class ParticleFilter(Node):
             return
         
         (r, theta) = self.transform_helper.convert_scan_to_polar_in_robot_frame(msg, self.base_frame)
-        print("r[0]={0}, theta[0]={1}".format(r[0], theta[0]))
+        # print("r[0]={0}, theta[0]={1}".format(r[0], theta[0]))
         # clear the current scan so that we can process the next one
         self.scan_to_process = None
 
         self.odom_pose = new_pose
         new_odom_xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
-        print("x: {0}, y: {1}, yaw: {2}".format(*new_odom_xy_theta))
+        # print("x: {0}, y: {1}, yaw: {2}".format(*new_odom_xy_theta))
 
         if not self.current_odom_xy_theta:
             self.current_odom_xy_theta = new_odom_xy_theta
@@ -183,27 +188,18 @@ class ParticleFilter(Node):
                 (1): compute the mean pose
                 (2): compute the most likely pose (i.e. the mode of the distribution)
         """
+        self.get_logger().info(" --- Update Robot Pose --- ")
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
         # Chose the robot's pose based on the pose of the highest weighted particle.
-        best_weight = 0.0
-        best_particle = None
-        for particle in self.particle_cloud:
-            if particle.w > best_weight:
-                best_particle = particle
-        if best_particle is None:
-            print("Can't choose best particle!")
-
-        # Set robot_pose based on the pose of the highest weighted particle.
-        self.robot_pose = Pose()
-        self.robot_pose.position.x = best_particle.x
-        self.robot_pose.position.y = best_particle.x
-        quaternion = quaternion_from_euler(0, 0, best_particle.theta)
-        self.robot_pose.orientation.x = quaternion[0]
-        self.robot_pose.orientation.y = quaternion[1]
-        self.robot_pose.orientation.z = quaternion[2]
-        self.robot_pose.orientation.w = quaternion[3]
+        robot_pose = self.logicProvider.update_robot_pose(self.particle_cloud)
+        
+        if robot_pose is None:
+            self.get_logger.warn("Can't choose best particle!")
+            return
+        
+        self.robot_pose = robot_pose
 
         # Update the map offset based on robot_pose.
         if hasattr(self, 'odom_pose'):
@@ -218,6 +214,7 @@ class ParticleFilter(Node):
             that indicates the change in position and angle between the odometry
             when the particles were last updated and the current odometry.
         """
+        self.get_logger().info(" --- Update Particle Locations --- ")
         new_odom_xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
         # compute the change in x,y,theta since our last update
         if self.current_odom_xy_theta:
@@ -231,12 +228,7 @@ class ParticleFilter(Node):
             self.current_odom_xy_theta = new_odom_xy_theta
             return
         
-        for p in self.particle_cloud:
-            dT = old_odom_xy_theta[2] - p.theta
-            new_x = p.x + (delta[0]*math.cos(dT) + delta[1]*math.sin(dT))
-            new_y = p.y + (-delta[0]*math.sin(dT) + delta[1]*math.cos(dT))
-            new_t = p.theta + delta[3]
-            p.x, p.y, p.theta = new_x, new_y, new_t
+        self.particle_cloud = self.logicProvider.update_particles_with_odom(delta, old_odom_xy_theta, self.particle_cloud)
 
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
@@ -245,23 +237,11 @@ class ParticleFilter(Node):
             function draw_random_sample in helper_functions.py.
         """
         # make sure the distribution is normalized
+        self.get_logger().info(" --- Resample Particle --- ")
         self.normalize_particles()
-        prob_list = [p.w for p in self.particle_cloud]
-        n_particle_uniform = 50
-        particles: list[Particle] = draw_random_sample(self.particle_cloud, prob_list, self.n_particles-n_particle_uniform)
-        sd = 0.2 # noise level
-        theta_spread = 4;
-        bounds = OccupancyField.get_obstacle_bounding_box()
-        for p in particles:
-            noise_xy = random.gauss(0, sd)
-            t_val = random.vonmisesvariate(p.theta, theta_spread)
-            p.x, p.y, p.theta = p.x+noise_xy, p.y+noise_xy, t_val
-        for i in range(n_particle_uniform):
-            x_pos = random.uniform(bounds[0][0], bounds[0][1])
-            y_pos = random.uniform(bounds[1][0], bounds[1][1])
-            theta_val = random.unifrom(0, 2*math.pi);
-            p = Particle(x = x_pos, y = y_pos, theta = theta_val)
-            particles.append(p)
+        
+        particles = self.logicProvider.resample_particles(self.particle_cloud, self.get_parameter("n_particles_uniform"))
+            
         self.particle_cloud = particles
 
     def update_particles_with_laser(self, r, theta):
@@ -276,15 +256,13 @@ class ParticleFilter(Node):
             theta: the angle relative to the robot frame
             for each corresponding reading.
         """
+        self.get_logger().info(" --- Update Particle Weights --- ")
         # Calculate all the weights
-        shortest_measured = min(r)
-        for particle in self.particle_cloud:
-            shortest_calculated = (
-                self.occupancy_field.get_closest_obstacle_distance(
-                particle.x, particle.y))
-            difference = shortest_measured - shortest_calculated
-            weight = 1 / abs(difference)
-            particle.w = weight
+        particles, count_OOB = self.logicProvider.update_particles_with_laser(r, theta, self.particle_cloud)
+        self.particle_cloud = particles
+        
+        if count_OOB >= 50:
+            self.get_logger().warn(f"Number of out of bounds particles is: {count_OOB}")
 
         # Normalize the particle weights
         self.normalize_particles()
@@ -300,22 +278,18 @@ class ParticleFilter(Node):
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
                       particle cloud around.  If this input is omitted, the odometry will be used """
+                      
+        self.get_logger().info(" --- Initial Particle Cloud --- ")
+        
         if xy_theta is None:
-            xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
+            # If we dont get an initial guess then we just uniformly place guesses over the bounds of the map
+            # xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose);
+            pass
         self.particle_cloud = []
-        bounds = self.occupancy_field.get_obstacle_bounding_box()
-        x_div = 2 #kinda just a magic number should be tweaked 
-        y_div = 2 #kinda just a magic number should be tweaked 
-        x_min_max = ((bounds[0][0] - xy_theta[0])/x_div, (bounds[0][1] - xy_theta[0])/x_div);
-        y_min_max = ((bounds[1][0] - xy_theta[1])/y_div, (bounds[1][1] - xy_theta[1])/y_div);
-        theta_div = 4 #kinda just a magic number should be tweaked 
-        for i in range(self.n_particles):
-            x = truncnorm.rvs(x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div);
-            y = truncnorm.rvs(y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div);
-            t = random.vonmisesvariate(xy_theta[2], theta_div)
-            p = Particle(x = x, y = y, theta = t)
-            self.particle_cloud.append(p)
-
+        
+        particles = self.logicProvider.initialize_particle_cloud(timestamp, xy_theta)
+        self.particle_cloud = particles
+                
         self.normalize_particles()
         self.update_robot_pose()
 
