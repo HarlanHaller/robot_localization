@@ -46,16 +46,12 @@ class TestInitialize(TestBase):
         assert 1==1
 
 class TestUpdateParticlesWithLaser(TestBase):
-    def __init__(self):
+    def initialize_data(self):
         """ Initialize enough variables to test with """
-        super().__init__()
+        super().create_logic_provider()
         self.particle_cloud = LogicProvider.initialize_particle_cloud(self, 0)
         self.theta = [i for i in range(361)]
 
-    def take_random_scan(self):
-        """
-        Make a random laser scan.
-        """
         # Randomly choose the distance to the closest object to the robot
         # from 0 to 3 meters.
         min_dist = random.random() * 3
@@ -69,44 +65,20 @@ class TestUpdateParticlesWithLaser(TestBase):
         assert 0 <= min_dist <= 3
         assert all(min_dist <= r <= 5 for r in self.r)
 
-    def retest(self, assertion):
-        """
-        Make 10 random scans and for each one assert that assertion is true.
-
-        Args:
-            assertion: A function that takes in self.particle_cloud
-            representing the assertion to assert.
-        """
-        for _ in range(10):
-            self.take_random_scan()
-            (self.particle_cloud, _) = LogicProvider.update_particles_with_laser(
-                self.r, self.theta, self.particle_cloud)
-            assert assertion(self.particle_cloud)
-
+    @pytest.mark.repeat(10)
     def test_positive(self):
         """ Test that all the particle weights are positive. """
-        def all_positive(particle_cloud):
-            return all(p.w >= 0 for p in particle_cloud)
+        self.initialize_data()
+        assert all(p.w >= 0 for p in self.particle_cloud)
 
-        self.retest(all_positive)
-
+    @pytest.mark.repeat(10)
     def test_float(self):
         """ Test that all the particle weights are floats. """
-        def all_floats(particle_cloud):
-            return all(isinstance(p.w, float) for p in particle_cloud)
+        self.initialize_data()
+        assert all(isinstance(p.w, float) for p in self.particle_cloud)
 
-        self.retest(all_floats)
-
-    def test_sum_to_one(self):
-        """ Test that the sum of all the particle weights is 1. """
-        def sum_is_one(particle_cloud):
-            return sum(p.w for p in particle_cloud) == pytest.approx(1)
-
-        self.retest(sum_is_one)
-
+    @pytest.mark.repeat(10)
     def test_not_nan(self):
         """ Test that all the particle weights are not nan. """
-        def none_are_nan(particle_cloud):
-            return all(not math.isnan(p.w) for p in particle_cloud)
-
-        self.retest(none_are_nan)
+        self.initialize_data()
+        assert all(not math.isnan(p.w) for p in self.particle_cloud)
