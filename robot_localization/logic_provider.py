@@ -80,7 +80,8 @@ class LogicProvider:
         self,
         delta: Tuple,
         old_odom_xy_theta: Tuple,
-        particle_cloud: List[Particle]) -> List[Particle]:
+        particle_cloud: List[Particle]
+    ) -> List[Particle]:
         for p in particle_cloud:
             dT = old_odom_xy_theta[2] - p.theta
             new_x = p.x + (delta[0]*math.cos(dT) + delta[1]*math.sin(dT))
