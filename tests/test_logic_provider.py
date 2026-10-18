@@ -105,6 +105,191 @@ class TestUpdateWithOdom(TestBase):
         out_array = self.particles_to_array(new_particles)
         
         assert out_array == pytest.approx(end_arr)
+        
+
+class TestInitializeParticleCloud(TestBase):
+    def test_number(self):
+        self.create_logic_provider()
+        
+        particles = self.logic_provider.initialize_particle_cloud(0)
+        assert len(particles) == self.n_particles
+        
+    def test_avg_uniform(self, plt):
+        self.create_logic_provider(n_particles=1000)
+        particles = self.logic_provider.initialize_particle_cloud(0)
+        
+        bounds = self.occupancy_field.get_obstacle_bounding_box()
+        center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        x_vals = [p.x for p in particles]
+        y_vals = [p.y for p in particles]
+        theta_vals = [p.theta for p in particles]
+        avg_x = sum(x_vals) / len(x_vals)
+        avg_y = sum(y_vals) / len(y_vals)
+        avg_theta = sum(theta_vals) / len(theta_vals)
+        error_x = avg_x-center[0]
+        error_y = avg_y-center[1]
+        error_theta = avg_theta-center[2]
+        
+        plt.scatter(x_vals, y_vals, label = "points")
+        plt.scatter(avg_x, avg_y, c="red", label="averge")
+        plt.scatter(center[0], center[1], c="black", label="center")
+        plt.title("uniform dist")
+        plt.legend()
+        
+        assert abs(error_x) <= 0.1
+        assert abs(error_y) <= 0.1
+        assert abs(error_theta) <= 0.15
+        
+    def test_avg_with_guess(self, plt):
+        self.create_logic_provider(n_particles=2000)
+    
+        guess = (1, -2, 0)
+        
+        particles = self.logic_provider.initialize_particle_cloud(0, guess)
+        
+        x_vals = [p.x for p in particles]
+        y_vals = [p.y for p in particles]
+        theta_vals = [p.theta for p in particles]
+        avg_x = sum(x_vals) / len(x_vals)
+        avg_y = sum(y_vals) / len(y_vals)
+        error_x = avg_x-guess[0]
+        error_y = avg_y-guess[1]
+        
+        plt.scatter(x_vals, y_vals, label = "points")
+        plt.scatter(avg_x, avg_y, c="red", label="averge")
+        plt.scatter(guess[0], guess[1], c="black", label="guess")
+        plt.title("initialized with a guess")
+        plt.legend()
+        
+        assert abs(error_x) <= 0.1
+        assert abs(error_y) <= 0.1
+
+
+class TestResampleParticles(TestBase):
+    def test_number(self):
+        self.create_logic_provider()
+        
+        particles = self.logic_provider.initialize_particle_cloud(0)
+        new_particles = self.logic_provider.resample_particles(particles)
+        assert len(new_particles) == self.n_particles
+        
+    def test_1_weighted(self, plt):
+        self.create_logic_provider(n_particles_uniform=0)
+        #don't include uniform particles because they will drag the center away from the guess point
+        
+        particles = [Particle(w=0) for _ in range(10000)]
+        pos = (1, -2)
+        particles[0].w = 1
+        particles[0].x = pos[0]
+        particles[0].y = pos[1]
+        
+        new_particles = self.logic_provider.resample_particles(particles)
+        x_vals = [p.x for p in new_particles]
+        y_vals = [p.y for p in new_particles]
+        avg_x = sum(x_vals) / len(x_vals)
+        avg_y = sum(y_vals) / len(y_vals)
+        error_x = avg_x-pos[0]
+        error_y = avg_y-pos[1]
+        
+        plt.scatter(x_vals, y_vals, label = "points")
+        plt.scatter(avg_x, avg_y, c="red", label="averge")
+        plt.scatter(pos[0], pos[1], c="black", label="set point")
+        plt.title("sampled on 1 weighted point")
+        plt.legend()
+        
+        assert abs(error_x) <= 0.05
+        assert abs(error_y) <= 0.05
+        
+    def test_3_weighted(self, plt):
+        self.create_logic_provider()
+        #the uniform particles are ok here because our target center is in the center of the bounds
+        
+        bounds = self.occupancy_field.get_obstacle_bounding_box()
+        center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        particles = [Particle(w=0) for _ in range(10000)]
+        d = 0.5
+        pos = ((center[0]+d, center[1]), 
+               (center[0]+d*math.cos(2*math.pi/3), center[1]+d*math.sin(2*math.pi/3)), 
+               (center[0]+d*math.cos(4*math.pi/3), center[1]+d*math.sin(4*math.pi/3)))
+        particles[0].w = 1/3
+        particles[1].w = 1/3
+        particles[2].w = 1/3
+        particles[0].x = pos[0][0]
+        particles[1].x = pos[1][0]
+        particles[2].x = pos[2][0]
+        particles[0].y = pos[0][1]
+        particles[1].y = pos[1][1]
+        particles[2].y = pos[2][1]
+
+        
+        new_particles = self.logic_provider.resample_particles(particles)
+        x_vals = [p.x for p in new_particles]
+        y_vals = [p.y for p in new_particles]
+        avg_x = sum(x_vals) / len(x_vals)
+        avg_y = sum(y_vals) / len(y_vals)
+        error_x = avg_x-center[0]
+        error_y = avg_y-center[1]
+        
+        plt.scatter(x_vals, y_vals, label = "points")
+        plt.scatter(avg_x, avg_y, c="red", label="averge")
+        plt.scatter(center[0], center[1], c="purple", label="center")
+        plt.scatter([pos[0][0], pos[1][0], pos[2][0]], [pos[0][1], pos[1][1], pos[2][1]], c="black", label="weighted points")
+        plt.title("sampled on 3 weighted points")
+        plt.legend()
+        
+        assert abs(error_x) <= 0.1
+        assert abs(error_y) <= 0.1
+        
+    def test_different_weights(self, plt):
+        self.create_logic_provider()
+        particles = [Particle(w=0) for _ in range(10000)]
+        
+        def set_weighted_points(n_points, dist, center, weights_list):
+            poses = []
+            angle_part = 2*math.pi/n_points
+            for i in range(n_points):
+                poses.append((center[0]+math.cos(angle_part*i)*dist, center[1]+math.sin(angle_part*i)*dist))
+                p = particles[i]
+                p.w = weights_list[i]
+                p.x, p.y = poses[i]
+            return poses
+        
+        bounds = self.occupancy_field.get_obstacle_bounding_box()
+        center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        n_points = 5
+        dist = 0.5
+        weights_list = [0.05, 0.1, 0.5, 0.25, 0.1]
+        weighted_poses = set_weighted_points(n_points, dist, center, weights_list)
+        
+        new_particles = self.logic_provider.resample_particles(particles)
+        x_vals = [p.x for p in new_particles]
+        y_vals = [p.y for p in new_particles]
+        avg_x = sum(x_vals) / len(x_vals)
+        avg_y = sum(y_vals) / len(y_vals)
+        
+
+        weighted_center_x = sum([weighted_poses[i][0]*weights_list[i] for i in range(n_points)])
+        weighted_center_y = sum([weighted_poses[i][1]*weights_list[i] for i in range(n_points)])
+        
+        error_x = avg_x-weighted_center_x
+        error_y = avg_y-weighted_center_y
+        
+        
+        plt.scatter(x_vals, y_vals, label = "points")
+        plt.scatter(avg_x, avg_y, c="red", label="averge")
+        plt.scatter(weighted_center_x, weighted_center_y, c="purple", label="weighted_center")
+        plt.scatter([p[0] for p in weighted_poses], [p[1] for p in weighted_poses], c="black", label="weighted points")
+        plt.title("sampled on 5 differently weighted points")
+        plt.legend()
+        plt.axis('equal')
+        
+        assert abs(error_x) <= 0.1
+        assert abs(error_y) <= 0.1
+            
+
+        
+        
+        
 
 class TestUpdateParticlesWithLaser(TestBase):
     def initialize_data(self):

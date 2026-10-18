@@ -104,9 +104,10 @@ class LogicProvider:
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
         for p in particles:
-            noise_xy = random.gauss(0, sd)
+            noise_x = random.gauss(0, sd)
+            noise_y = random.gauss(0, sd)
             t_val = random.vonmisesvariate(p.theta, theta_spread)
-            p.x, p.y, p.theta = p.x+noise_xy, p.y+noise_xy, t_val
+            p.x, p.y, p.theta = p.x+noise_x, p.y+noise_y, t_val
         for _ in range(n_particles_uniform):
             x_pos = random.uniform(bounds[0][0], bounds[0][1])
             y_pos = random.uniform(bounds[1][0], bounds[1][1])
