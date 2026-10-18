@@ -296,11 +296,7 @@ class ParticleFilter(Node):
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
-        weight_sum = sum(particle.w for particle in self.particle_cloud)
-        if abs(weight_sum - 1) < 1e-6:
-            return
-        for particle in self.particle_cloud:
-            particle.w = particle.w / weight_sum
+        self.particle_cloud = LogicProvider.normalize(self.particle_cloud)
 
     def publish_particles(self, timestamp):
         msg = ParticleCloud()

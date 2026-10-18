@@ -183,3 +183,21 @@ class LogicProvider:
                 particle_cloud.append(p)
 
         return particle_cloud
+
+    def normalize(self, particle_cloud):
+        """
+        Normalize the weights of a particle cloud so the sum equals one.
+
+        Args:
+            particle_cloud: A list of Particles to normalize.
+        
+        Returns:
+            particle_cloud: A list of particles with normalized weights.
+        """
+        weight_sum = sum(particle.w for particle in particle_cloud)
+        if abs(weight_sum - 1) < 1e-6:
+            return
+        for particle in particle_cloud:
+            particle.w = particle.w / weight_sum
+
+        return particle_cloud

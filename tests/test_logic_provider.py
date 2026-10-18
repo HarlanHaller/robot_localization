@@ -293,9 +293,9 @@ class TestResampleParticles(TestBase):
 
 class TestUpdateParticlesWithLaser(TestBase):
     def initialize_data(self):
-        """ Initialize enough variables to test with """
+        """ Initialize enough variables to test with. """
         super().create_logic_provider()
-        self.particle_cloud = LogicProvider.initialize_particle_cloud(self, 0)
+        self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
         self.theta = [i for i in range(361)]
 
         # Randomly choose the distance to the closest object to the robot
@@ -328,3 +328,23 @@ class TestUpdateParticlesWithLaser(TestBase):
         """ Test that all the particle weights are not nan. """
         self.initialize_data()
         assert all(not math.isnan(p.w) for p in self.particle_cloud)
+
+class TestNormalize(TestBase):
+    def initialize_data(self):
+        """ Initialize enough variables to test with. """
+        super().create_logic_provider()
+        self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
+
+    @pytest.mark.repeat(10)
+    def test_sum_is_one(self):
+        self.initialize_data()
+
+        # Randomize the weights of the particles.
+        for p in self.particle_cloud:
+            p.w = random.random() * 100
+
+        # Normalize their weights.
+        self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
+
+        assert sum(p.w for p in self.particle_cloud) == pytest.approx(1)
+
