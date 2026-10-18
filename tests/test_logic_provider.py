@@ -401,6 +401,8 @@ class TestUpdateRobotPose(TestBase):
 
         # Calculate the robot's pose
         robot_pose = self.logic_provider.update_robot_pose(self.particle_cloud)
+        
+        assert robot_pose is not None
 
         # Make a list of the highest weighted particles,
         # one if there is a highest more if there is a tie.

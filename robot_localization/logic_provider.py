@@ -148,7 +148,7 @@ class LogicProvider:
             # Otherwise set the weight based on a normal
             # distribution around the real closest distance.
             weight = norm.pdf(shortest_calculated, loc=shortest_measured, scale=1)
-            particle.w = weight
+            particle.w = weight # type: ignore
 
         return (particle_cloud, count_OOB)
 
@@ -187,7 +187,7 @@ class LogicProvider:
 
         return particle_cloud
 
-    def normalize(self, particle_cloud):
+    def normalize(self, particle_cloud) -> List[Particle]:
         """
         Normalize the weights of a particle cloud so the sum equals one.
 
@@ -199,7 +199,7 @@ class LogicProvider:
         """
         weight_sum = sum(particle.w for particle in particle_cloud)
         if abs(weight_sum - 1) < 1e-6:
-            return
+            return particle_cloud
         for particle in particle_cloud:
             particle.w = particle.w / weight_sum
 
