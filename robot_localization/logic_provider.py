@@ -65,8 +65,11 @@ class LogicProvider:
         for particle in particle_cloud:
             if particle.w > best_weight:
                 best_particle = particle
+                best_weight = particle.w
         if best_particle is None:
             return
+
+        #print(max(p.w for p in particle_cloud) == best_particle.w)
 
         # Set robot_pose based on the pose of the highest weighted particle.
         robot_pose = Pose()

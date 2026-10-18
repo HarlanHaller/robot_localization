@@ -5,6 +5,7 @@ from typing import List
 import pytest
 import numpy as np
 import yaml
+from robot_localization.angle_helpers import euler_from_quaternion
 from robot_localization.logic_provider import LogicProvider, Particle
 from test_support_classes.support_occupancy_field import OccupancyField
 from test_support_classes.support_parameter import Parameter
@@ -311,6 +312,11 @@ class TestUpdateParticlesWithLaser(TestBase):
         assert 0 <= min_dist <= 3
         assert all(min_dist <= r <= 5 for r in self.r)
 
+        # Update the particle weights.
+        (self.particle_cloud, _) = self.logic_provider.update_particles_with_laser(
+            self.r, self.theta, self.particle_cloud
+        )
+
     @pytest.mark.repeat(10)
     def test_positive(self):
         """ Test that all the particle weights are positive. """
@@ -348,3 +354,83 @@ class TestNormalize(TestBase):
 
         assert sum(p.w for p in self.particle_cloud) == pytest.approx(1)
 
+class TestUpdateRobotPose(TestBase):
+    def initialize_data(self):
+        """ Initialize enough variables to test with. """
+        super().create_logic_provider()
+        self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
+        self.theta = [i for i in range(361)]
+
+        # Randomly choose the distance to the closest object to the robot
+        # from 0 to 3 meters.
+        min_dist = random.random() * 3
+
+        # Make a random laser scan with distances
+        # from 0-3 meters to 5 meters.
+        self.r = [random.random() * (5 - min_dist) + min_dist for _ in range(360)]
+        self.r.append(self.r[0])
+
+        # Make sure the scan is in the right range.
+        assert 0 <= min_dist <= 3
+        assert all(min_dist <= r <= 5 for r in self.r)
+        self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
+
+        # Update the particle weights.
+        (self.particle_cloud, _) = self.logic_provider.update_particles_with_laser(
+            self.r, self.theta, self.particle_cloud
+        )
+
+    @pytest.mark.repeat(10)
+    def test_highest_weight(self):
+        """
+        Assert that the robot pose is that of the highest weighted particle.
+        """
+        self.initialize_data()
+
+        # Calculate the robot's pose
+        robot_pose = self.logic_provider.update_robot_pose(self.particle_cloud)
+
+        # Make a list of the highest weighted particles,
+        # one if there is a highest more if there is a tie.
+        weight_max = max(p.w for p in self.particle_cloud)
+        #print(f"{weight_max = }")
+        best_list = []
+        for p in self.particle_cloud:
+            if p.w == weight_max:
+                best_list.append(p)
+
+        assert len(best_list) > 0
+        #print(f"{len(best_list) = }")
+
+        # For each particle in the list:
+        for p in best_list:
+            # Check if it has the same position and angle as the robot.
+            same_x = abs(robot_pose.position.x - p.x) < 1e-6
+            same_y = abs(robot_pose.position.y - p.y) < 1e-6
+            (roll, pitch, theta) = euler_from_quaternion(
+                robot_pose.orientation.x,
+                robot_pose.orientation.y,
+                robot_pose.orientation.z,
+                robot_pose.orientation.w
+            )
+            same_theta = abs((theta % (2*math.pi)) - (p.theta % (2*math.pi))) < 1e-6
+
+            #print(f"{roll = }")
+            #print(f"{pitch = }")
+            #print(f"{robot_pose.position.x = }")
+            #print(f"{p.x = }")
+            #print(f"{robot_pose.position.y = }")
+            #print(f"{p.y = }")
+            #print(f"{theta = }")
+            #print(f"{p.theta = }")
+
+            # If all are the same, pass the assertion
+            if same_x and same_y and same_theta:
+                #print("pass\n")
+                return
+            
+            #print("fail\n")
+
+        # If a best particle that matches the robot pose hasn't been found:
+        # Fail the assertion.
+        assert False
