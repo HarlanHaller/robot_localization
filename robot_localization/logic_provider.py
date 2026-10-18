@@ -98,7 +98,7 @@ class LogicProvider:
         return particle_cloud
 
     def resample_particles(self, particle_cloud: List[Particle]) -> List[Particle]:
-        n_particles_uniform = self.n_particles_uniform_param.value
+        n_particles_uniform: int = self.n_particles_uniform_param.value # type: ignore
         prob_list = [p.w for p in particle_cloud]
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
@@ -167,10 +167,10 @@ class LogicProvider:
             print("guess recived")
             x_min_max = ((bounds[0][0] - xy_theta[0])/x_div, (bounds[0][1] - xy_theta[0])/x_div)
             y_min_max = ((bounds[1][0] - xy_theta[1])/y_div, (bounds[1][1] - xy_theta[1])/y_div)
-            x_vals = truncnorm.rvs(
-                x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div, size=self.n_particles)
-            y_vals = truncnorm.rvs(
-                y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div, size=self.n_particles)
+            x_vals: List[int] = truncnorm.rvs(
+                x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div, size=self.n_particles) # pyright: ignore[reportAssignmentType]
+            y_vals: List[int] = truncnorm.rvs(
+                y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div, size=self.n_particles) # pyright: ignore[reportAssignmentType]
             for i in range(self.n_particles):
                 x = x_vals[i]
                 y = y_vals[i]

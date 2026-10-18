@@ -17,7 +17,7 @@ class TestBase:
         self.n_particles = n_particles
         self.n_particles_uniform_param = Parameter(n_particles_uniform)
         self.logic_provider = LogicProvider(
-            self.occupancy_field, self.n_particles, self.n_particles_uniform_param)
+            self.occupancy_field, self.n_particles, self.n_particles_uniform_param) # pyright: ignore[reportArgumentType]
 
 
 class TestUpdateWithOdom(TestBase):
@@ -287,10 +287,6 @@ class TestResampleParticles(TestBase):
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
             
-
-        
-        
-        
 
 class TestUpdateParticlesWithLaser(TestBase):
     def initialize_data(self):
