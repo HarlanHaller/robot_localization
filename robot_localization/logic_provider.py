@@ -87,9 +87,9 @@ class LogicProvider:
         particle_cloud: List[Particle]
     ) -> List[Particle]:
         for p in particle_cloud:
-            dT = old_odom_xy_theta[2] - p.theta
-            new_x = p.x + (delta[0]*math.cos(dT) + delta[1]*math.sin(dT))
-            new_y = p.y + (-delta[0]*math.sin(dT) + delta[1]*math.cos(dT))
+            dT = p.theta - old_odom_xy_theta[2]
+            new_x = p.x + (delta[0]*math.cos(dT) - delta[1]*math.sin(dT))
+            new_y = p.y + (delta[0]*math.sin(dT) + delta[1]*math.cos(dT))
             new_t = p.theta + delta[2]
             p.x, p.y, p.theta = new_x, new_y, new_t
         return particle_cloud

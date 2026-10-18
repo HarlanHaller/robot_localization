@@ -1,9 +1,14 @@
 import math
+import os
 import random
+from typing import List
 import pytest
+import numpy as np
+import yaml
 from robot_localization.logic_provider import LogicProvider, Particle
 from test_support_classes.support_occupancy_field import OccupancyField
 from test_support_classes.support_parameter import Parameter
+
 
 class TestBase:
     def create_logic_provider(self, n_particles = 300, n_particles_uniform = 50):
@@ -14,9 +19,23 @@ class TestBase:
             self.occupancy_field, self.n_particles, self.n_particles_uniform_param)
 
 
-class TestUpdateWithOdom(TestBase):        
-    def test_move_1(self):
+class TestUpdateWithOdom(TestBase):
+    def array_to_particles(self, arr) -> List[Particle]:
+        particles: List[Particle] = []
+        for i in range(arr.shape[1]):
+            p = Particle(x = arr[0, i], y=arr[1,i], theta=arr[2,i])
+            particles.append(p)
+        return particles
+    
+    def particles_to_array(self, plist):
+        arr = np.array([[p.x, p.y, p.theta] for p in plist]).T
+        return arr
+            
+    
+    
+    def test_move_1p_1(self):
         self.create_logic_provider()
+        
         particles = [Particle(x = 1, y = 2, theta=(3 * math.pi / 2))]
         N_start = (2, 1, math.pi / 2)
         N_end = (2, 2, math.pi / 6)
@@ -25,25 +44,67 @@ class TestUpdateWithOdom(TestBase):
         
         expected_theta = 3 * math.pi / 2 + d_t
         
-        assert new_particles[0].as_tuple() == pytest.approx((1, 2, expected_theta))
+        assert new_particles[0].as_tuple() == pytest.approx((1, 1, expected_theta))
+        
+    def test_move_1p_2(self):
+        self.create_logic_provider()
+        
+        particles = [Particle(x = 1, y = 2, theta=(0))]
+        N_start = (2, 1, math.pi / 2)
+        N_end = (2, 2, math.pi / 6)
+        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        
+        expected_theta = 0 + d_t
+        
+        assert new_particles[0].as_tuple() == pytest.approx((2, 2, expected_theta))
+        
+    def test_move_5p(self):
+        self.create_logic_provider()
+        
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.abspath(os.path.join(file_path, 'test_data.yaml'))
+        
+        with open(yaml_path, "r") as f:
+            data = yaml.safe_load(f)
+            start_arr_content = data['particles_5_start']
+            end_arr_content = data['particles_5_end']
+            
+        start_arr = np.array(start_arr_content)
+        end_arr = np.array(end_arr_content)
+        
+        particles = self.array_to_particles(start_arr)
 
-class TestResample(TestBase):
-    def __init__(self):
-        super().__init__()
+        N_start = (2, 1, math.pi / 4)
+        N_end = (2, 2, math.pi / 4)
+        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        out_array = self.particles_to_array(new_particles)
+        
+        assert out_array == pytest.approx(end_arr)
+        
+    def test_move_many(self):
+        self.create_logic_provider()
+        
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.abspath(os.path.join(file_path, 'test_data.yaml'))
+        
+        with open(yaml_path, "r") as f:
+            data = yaml.safe_load(f)
+            start_arr_content = data['particles_many_start']
+            end_arr_content = data['particles_many_end']        
+        
+        start_arr = np.array(start_arr_content)
+        end_arr = np.array(end_arr_content)
+        particles = self.array_to_particles(start_arr)
 
-    def test_part1(self):
-        assert 1.00000001 == pytest.approx(1)
-
-    def test_part2(self):
-        assert 0+1 == 2
-
-
-class TestInitialize(TestBase):
-    def __init__(self):
-        super().__init__()
-
-    def test_part1(self):
-        assert 1==1
+        N_start = (2, 1, math.pi / 6)
+        N_end = (2, 2, math.pi / 4)
+        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        out_array = self.particles_to_array(new_particles)
+        
+        assert out_array == pytest.approx(end_arr)
 
 class TestUpdateParticlesWithLaser(TestBase):
     def initialize_data(self):
