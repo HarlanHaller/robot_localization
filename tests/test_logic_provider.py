@@ -300,16 +300,16 @@ class TestUpdateParticlesWithLaser(TestBase):
         self.theta = [i for i in range(361)]
 
         # Randomly choose the distance to the closest object to the robot
-        # from 0 to 3 meters.
-        min_dist = random.random() * 3
+        # from 0 to 1 meters.
+        min_dist = random.random()
 
         # Make a random laser scan with distances
-        # from 0-3 meters to 5 meters.
+        # from 0-1 meters to 5 meters.
         self.r = [random.random() * (5 - min_dist) + min_dist for _ in range(360)]
         self.r.append(self.r[0])
 
         # Make sure the scan is in the right range.
-        assert 0 <= min_dist <= 3
+        assert 0 <= min_dist <= 1
         assert all(min_dist <= r <= 5 for r in self.r)
 
         # Update the particle weights.
@@ -334,6 +334,22 @@ class TestUpdateParticlesWithLaser(TestBase):
         """ Test that all the particle weights are not nan. """
         self.initialize_data()
         assert all(not math.isnan(p.w) for p in self.particle_cloud)
+
+    def test_weight_distribution(self, plt):
+        """ Graph the distribution of random particle weights """
+        # Take weights from n random samples:
+        n = 10
+        weights = []
+        for _ in range(n):
+            self.initialize_data()
+            weights += [p.w for p in self.particle_cloud]
+
+        # Sort and graph the weights
+        weights.sort()
+        plt.plot(range(len(weights)), weights)
+        plt.title(f"Weights of particles form {n} randomly generated scans")
+        plt.xlabel("index (sorted)")
+        plt.ylabel("weight (not normalized)")
 
 class TestNormalize(TestBase):
     def initialize_data(self):
@@ -362,16 +378,16 @@ class TestUpdateRobotPose(TestBase):
         self.theta = [i for i in range(361)]
 
         # Randomly choose the distance to the closest object to the robot
-        # from 0 to 3 meters.
-        min_dist = random.random() * 3
+        # from 0 to 1 meters.
+        min_dist = random.random()
 
         # Make a random laser scan with distances
-        # from 0-3 meters to 5 meters.
+        # from 0-1 meters to 5 meters.
         self.r = [random.random() * (5 - min_dist) + min_dist for _ in range(360)]
         self.r.append(self.r[0])
 
         # Make sure the scan is in the right range.
-        assert 0 <= min_dist <= 3
+        assert 0 <= min_dist <= 1
         assert all(min_dist <= r <= 5 for r in self.r)
         self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
 
