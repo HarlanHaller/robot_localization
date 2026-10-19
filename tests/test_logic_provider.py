@@ -352,7 +352,7 @@ class TestUpdateParticlesWithLaser(TestBase):
         self.initialize_data()
         assert all(not math.isnan(p.w) for p in self.particle_cloud)
 
-    def test_weight_distribution(self, plt):
+    def test_weight_v_index(self, plt):
         """ Graph the distribution of random particle weights """
         # Take weights from n random samples:
         n = 10
@@ -364,9 +364,23 @@ class TestUpdateParticlesWithLaser(TestBase):
         # Sort and graph the weights
         weights.sort()
         plt.plot(weights)
-        plt.title(f"Weights of particles form {n} randomly generated scans")
+        plt.title(f"Weights of particles from {n} randomly generated scans")
         plt.xlabel("index (sorted)")
         plt.ylabel("weight (not normalized)")
+
+    def test_histogram(self, plt):
+        """ Graph the distribution of random particle weights """
+        # Take weights from n random samples:
+        n = 10
+        weights = []
+        for _ in range(n):
+            self.initialize_data()
+            weights += [p.w for p in self.particle_cloud]
+
+        plt.hist(weights, 25)
+        plt.title(f"Probability of each weight from {n} randomly generated scans")
+        plt.xlabel("weights (not normalized)")
+        plt.ylabel(f"number found (from {n} particle clouds at different robot poses)")
 
 class TestNormalize(TestBase):
     def initialize_data(self):
