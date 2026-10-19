@@ -9,6 +9,7 @@ from scipy.stats import truncnorm, norm
 from std_msgs.msg import Header
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, TransformStamped
 from rclpy.parameter import Parameter
+import matplotlib.pyplot as plt
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -102,8 +103,8 @@ class LogicProvider:
         prob_list = [p.w for p in particle_cloud]
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
-        sd = 0.2 # noise level
-        theta_spread = 4
+        sd = 0.05 # noise level
+        theta_spread = 8
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
         for p in particles:
@@ -115,42 +116,76 @@ class LogicProvider:
             x_pos = random.uniform(bounds[0][0], bounds[0][1])
             y_pos = random.uniform(bounds[1][0], bounds[1][1])
             theta_val = random.uniform(0, 2*math.pi)
-            p = Particle(x = x_pos, y = y_pos, theta = theta_val)
+            p = Particle(x = x_pos, y = y_pos, theta = theta_val, w=0.0)
             particles.append(p)
 
+        # print("resample done")
         return particles
 
     def update_particles_with_laser(
         self, r, theta, particle_cloud: List[Particle]
-    ) -> Tuple[List[Particle], int]:
+    ) -> List[Particle]:
         """
         Calculate all the weights of particle cloud.
         """
         # Calculate the closest distance to the real robot.
-        shortest_measured = min(r)
-        # Count how many particles are out of bounds of the map.
-        count_OOB = 0
-
-        # For each particle:
+        sd = 0.01
+        bounds = self.occupancy_field.get_obstacle_bounding_box()
+        # print(r)
+        # print(theta)
+        
+        # particle = particle_cloud[10]
+        # particle_space: List[Tuple]=[]
+        # for i in range(len(r)):
+        #     if math.isinf(r[i]):
+        #         # This will make get_closest_obstacle_distance return nan instead of throwing an error
+        #         particle_space.append((10000.0, 10000.0))
+        #         continue
+        #     x_val = particle.x + math.cos(particle.theta+theta[i]) * r[i]
+        #     y_val = particle.y + math.sin(particle.theta+theta[i]) * r[i]
+        #     particle_space.append((x_val, y_val))
+        # xs = [p[0] for p in particle_space]
+        # ys = [p[1] for p in particle_space]
+        # plt.scatter(xs, ys)
+        # plt.scatter(particle.x, particle.y, c="black")
+        # plt.axis("equal")
+        # plt.savefig("test")
+        
         for particle in particle_cloud:
-            # Calculate the distance to the nearest obstacle on the map
-            shortest_calculated = (
-                self.occupancy_field.get_closest_obstacle_distance(
-                particle.x, particle.y))
-
-            # If it is outside the bounds of the map:
-            if math.isnan(shortest_calculated):
-                # Set the weight to zero.
-                particle.w = 0
-                count_OOB += 1
+            if particle.x < bounds[0][0] or particle.x > bounds[0][1] or particle.y < bounds[1][0] or particle.y > bounds[1][1]:
+                particle.w = 0.0
+                # print("OOB")
                 continue
-
-            # Otherwise set the weight based on a normal
-            # distribution around the real closest distance.
-            weight = norm.pdf(shortest_calculated, loc=shortest_measured, scale=1)
-            particle.w = weight # type: ignore
-
-        return (particle_cloud, count_OOB)
+            
+            particle_space: List[Tuple]=[]
+            for i in range(len(r)):
+                if math.isinf(r[i]):
+                    # This will make get_closest_obstacle_distance return nan instead of throwing an error
+                    particle_space.append((10000.0, 10000.0))
+                    continue
+                x_val = particle.x + math.cos(particle.theta+theta[i]) * r[i]
+                y_val = particle.y + math.sin(particle.theta+theta[i]) * r[i]
+                particle_space.append((x_val, y_val))
+            dists: List[float] = []
+            for cords in particle_space:
+                dists.append(self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1]))
+            confidence_sum: float = 0
+            count = 0
+            for dist in dists:
+                if not math.isnan(dist):
+                    confidence_sum += norm.pdf(dist, loc=0, scale=sd) # pyright: ignore[reportAssignmentType]
+                    count += 1
+            
+            weight = 0.0
+            
+            if count != 0:
+                weight = confidence_sum / count
+                
+            particle.w = weight
+            
+        #count_OOB = 0 archive from debugging, left in for evidence
+            
+        return particle_cloud
 
     def initialize_particle_cloud(self, timestamp, xy_theta=None) -> List[Particle]:
         bounds = self.occupancy_field.get_obstacle_bounding_box()

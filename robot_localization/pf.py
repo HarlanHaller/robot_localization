@@ -11,7 +11,7 @@ from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
 from nav2_msgs.msg import ParticleCloud
 from nav2_msgs.msg import Particle as Nav2Particle
-from geometry_msgs.msg import PoseWithCovarianceStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseWithCovarianceStamped, Pose, Point, Quaternion, PoseStamped
 from rclpy.duration import Duration
 import math
 import time
@@ -63,6 +63,8 @@ class ParticleFilter(Node):
 
         # publish the current particle cloud.  This enables viewing particles in rviz.
         self.particle_pub = self.create_publisher(ParticleCloud, "particle_cloud", qos_profile_sensor_data)
+        
+        self.robot_pose_testing_pub = self.create_publisher(PoseStamped, "robot_pose_debug", 10)
 
         # laser_subscriber listens for data from the lidar
         self.create_subscription(LaserScan, self.scan_topic, self.scan_received, 10)
@@ -80,7 +82,9 @@ class ParticleFilter(Node):
         self.occupancy_field = OccupancyField(self)
         self.transform_helper = TFHelper(self)
         
-        self.declare_parameter("n_particles_uniform", math.floor(self.n_particles*0.15))
+        self.declare_parameter("n_particles_uniform", math.floor(self.n_particles*0.0))
+        #We will use every n scan points starting from 0 where n is this paramater. (for optimization)
+        self.declare_parameter("scan_point_density", 2)
         
         self.logic_provider = LogicProvider(self.occupancy_field, self.n_particles, self.get_parameter("n_particles_uniform")) # pyright: ignore[reportArgumentType]
 
@@ -142,10 +146,10 @@ class ParticleFilter(Node):
             self.initialize_particle_cloud(msg.header.stamp)
         elif self.moved_far_enough_to_update(new_odom_xy_theta):
             # we have moved far enough to do an update!
+            self.resample_particles()               # resample particles to focus on areas of high density
             self.update_particles_with_odom()    # update based on odometry
             self.update_particles_with_laser(r, theta)   # update based on laser scan
             self.update_robot_pose()                # update robot's pose based on particles
-            self.resample_particles()               # resample particles to focus on areas of high density
         # publish particles (so things like rviz can see them)
         self.publish_particles(msg.header.stamp)
 
@@ -178,6 +182,14 @@ class ParticleFilter(Node):
         if hasattr(self, 'odom_pose'):
             self.transform_helper.fix_map_to_odom_transform(self.robot_pose,
                                                             self.odom_pose)
+             
+            msg = PoseStamped()
+            header = Header()
+            header.stamp = self.get_clock().now().to_msg()
+            header.frame_id = "map"
+            msg.header = header
+            msg.pose = self.robot_pose
+            self.robot_pose_testing_pub.publish(msg)
         else:
             self.get_logger().warn("Can't set map->odom transform since no odom data received")
 
@@ -216,6 +228,8 @@ class ParticleFilter(Node):
         particles = self.logic_provider.resample_particles(self.particle_cloud)
             
         self.particle_cloud = particles
+        
+        self.normalize_particles()
 
     def update_particles_with_laser(self, r, theta):
         """
@@ -231,11 +245,14 @@ class ParticleFilter(Node):
         """
         self.get_logger().info(" --- Update Particle Weights --- ")
         # Calculate all the weights
-        particles, count_OOB = self.logic_provider.update_particles_with_laser(r, theta, self.particle_cloud)
+        density = self.get_parameter("scan_point_density").value
+        reduced_r = r[0:360:density]
+        reduced_theta = theta[0:360:density]
+        particles = self.logic_provider.update_particles_with_laser(reduced_r, reduced_theta, self.particle_cloud)
         self.particle_cloud = particles
         
-        if count_OOB >= 50:
-            self.get_logger().warn(f"Number of out of bounds particles is: {count_OOB}")
+        # if count_OOB >= 50:
+        #     self.get_logger().warn(f"Number of out of bounds particles is: {count_OOB}")
 
         # Normalize the particle weights
         self.normalize_particles()
@@ -275,7 +292,8 @@ class ParticleFilter(Node):
         msg.header.frame_id = self.map_frame
         msg.header.stamp = timestamp
         for p in self.particle_cloud:
-            msg.particles.append(Nav2Particle(pose=p.as_pose(), weight=p.w)) # pyright: ignore[reportAttributeAccessIssue]
+            # print(p.w)
+            msg.particles.append(Nav2Particle(pose=p.as_pose(), weight=p.w*100)) # pyright: ignore[reportAttributeAccessIssue]
         self.particle_pub.publish(msg)
 
     def scan_received(self, msg):

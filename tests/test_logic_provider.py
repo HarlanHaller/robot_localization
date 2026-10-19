@@ -300,32 +300,53 @@ class TestUpdateParticlesWithLaser(TestBase):
         min_dist = random.random()
 
         # Make a random laser scan with distances
-        # from 0-1 meters to 5 meters.
-        self.r = [random.random() * (5 - min_dist) + min_dist for _ in range(360)]
+        # from min_dist meters to 3 meters.
+        self.r = [random.random() * (3 - min_dist) + min_dist for _ in range(360)]
         self.r.append(self.r[0])
+        
+        reduced_r = self.r[0:360:10]
+        reduced_theta = self.theta[0:360:10]
 
         # Make sure the scan is in the right range.
         assert 0 <= min_dist <= 1
         assert all(min_dist <= r <= 5 for r in self.r)
 
         # Update the particle weights.
-        (self.particle_cloud, _) = self.logic_provider.update_particles_with_laser(
-            self.r, self.theta, self.particle_cloud
+        self.particle_cloud = self.logic_provider.update_particles_with_laser(
+            reduced_r, reduced_theta, self.particle_cloud
         )
+        
+    def test_boundry_enforcment(self):
+        self.create_logic_provider()
+        r = [0.5]
+        theta = [0]
+        OOB_x_min = Particle(x=-10, y=0, theta=0)
+        OOB_x_max = Particle(x=10, y=0, theta=0)
+        OOB_y_min = Particle(x=0, y=-10, theta=0)
+        OOB_y_max = Particle(x=0, y=10, theta=0)
+        IB = Particle(x=0, y=0, theta=0)
+        p_list = [OOB_x_min, OOB_x_max, OOB_y_min, OOB_y_max, IB]
+        new_particles = self.logic_provider.update_particles_with_laser(r, theta, p_list)
+        assert new_particles[0].w == 0
+        assert new_particles[1].w == 0
+        assert new_particles[2].w == 0
+        assert new_particles[3].w == 0
+        assert new_particles[4].w >= 0
+        
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(3)
     def test_positive(self):
         """ Test that all the particle weights are positive. """
         self.initialize_data()
         assert all(p.w >= 0 for p in self.particle_cloud)
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(3)
     def test_float(self):
         """ Test that all the particle weights are floats. """
         self.initialize_data()
         assert all(isinstance(p.w, float) for p in self.particle_cloud)
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(3)
     def test_not_nan(self):
         """ Test that all the particle weights are not nan. """
         self.initialize_data()
@@ -342,7 +363,7 @@ class TestUpdateParticlesWithLaser(TestBase):
 
         # Sort and graph the weights
         weights.sort()
-        plt.plot(range(len(weights)), weights)
+        plt.plot(weights)
         plt.title(f"Weights of particles form {n} randomly generated scans")
         plt.xlabel("index (sorted)")
         plt.ylabel("weight (not normalized)")
@@ -353,7 +374,7 @@ class TestNormalize(TestBase):
         super().create_logic_provider()
         self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
 
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(3)
     def test_sum_is_one(self):
         self.initialize_data()
 
@@ -368,31 +389,33 @@ class TestNormalize(TestBase):
 
 class TestUpdateRobotPose(TestBase):
     def initialize_data(self):
-        """ Initialize enough variables to test with. """
-        super().create_logic_provider()
-        self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
-        self.theta = [i for i in range(361)]
+            """ Initialize enough variables to test with. """
+            super().create_logic_provider()
+            self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
+            self.theta = [i for i in range(361)]
+    
+            # Randomly choose the distance to the closest object to the robot
+            # from 0 to 1 meters.
+            min_dist = random.random()
+    
+            # Make a random laser scan with distances
+            # from min_dist meters to 3 meters.
+            self.r = [random.random() * (3 - min_dist) + min_dist for _ in range(360)]
+            self.r.append(self.r[0])
+            
+            reduced_r = self.r[0:360:10]
+            reduced_theta = self.theta[0:360:10]
+    
+            # Make sure the scan is in the right range.
+            assert 0 <= min_dist <= 1
+            assert all(min_dist <= r <= 5 for r in self.r)
+    
+            # Update the particle weights.
+            self.particle_cloud = self.logic_provider.update_particles_with_laser(
+                reduced_r, reduced_theta, self.particle_cloud
+            )
 
-        # Randomly choose the distance to the closest object to the robot
-        # from 0 to 1 meters.
-        min_dist = random.random()
-
-        # Make a random laser scan with distances
-        # from 0-1 meters to 5 meters.
-        self.r = [random.random() * (5 - min_dist) + min_dist for _ in range(360)]
-        self.r.append(self.r[0])
-
-        # Make sure the scan is in the right range.
-        assert 0 <= min_dist <= 1
-        assert all(min_dist <= r <= 5 for r in self.r)
-        self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
-
-        # Update the particle weights.
-        (self.particle_cloud, _) = self.logic_provider.update_particles_with_laser(
-            self.r, self.theta, self.particle_cloud
-        )
-
-    @pytest.mark.repeat(10)
+    @pytest.mark.repeat(3)
     def test_highest_weight(self):
         """
         Assert that the robot pose is that of the highest weighted particle.

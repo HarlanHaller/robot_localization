@@ -6,6 +6,7 @@ from nav_msgs.srv import GetMap
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 import pickle
+import math
 
 class OccupancyField(object):
     """ Stores an occupancy field for an input map.  An occupancy field returns
