@@ -103,8 +103,8 @@ class LogicProvider:
         prob_list = [p.w for p in particle_cloud]
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
-        sd = 0.05 # noise level
-        theta_spread = 8
+        sd = 0.005 # noise level
+        theta_spread = 50
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
         for p in particles:
@@ -122,6 +122,22 @@ class LogicProvider:
         # print("resample done")
         return particles
 
+    @classmethod
+    def gaussian_pdf(cls, points, std:float):
+        """
+        PDF from a zero-centered gaussian distribution.
+
+        Args:
+            points (list of floats): points to sample at
+            std (float): two times the standard deviation
+            of the gaussian squared
+        
+            Returns:
+                A list of floats representing the values
+                of the gaussian sampled at points
+        """
+        return np.exp(np.square(points) / -std)
+
     def update_particles_with_laser(
         self, r, theta, particle_cloud: List[Particle]
     ) -> List[Particle]:
@@ -130,6 +146,7 @@ class LogicProvider:
         """
         # Calculate the closest distance to the real robot.
         sd = 0.01
+        sd_preprossed = sd*sd * 2
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         # print(r)
         # print(theta)
@@ -166,21 +183,15 @@ class LogicProvider:
                 x_val = particle.x + math.cos(particle.theta+theta[i]) * r[i]
                 y_val = particle.y + math.sin(particle.theta+theta[i]) * r[i]
                 particle_space.append((x_val, y_val))
-            dists: List[float] = []
-            for cords in particle_space:
-                dists.append(self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1]))
-            confidence_sum: float = 0
-            count = 0
-            for dist in dists:
-                if not math.isnan(dist):
-                    confidence_sum += norm.pdf(dist, loc=0, scale=sd) # pyright: ignore[reportAssignmentType]
-                    count += 1
+            dists = np.zeros(len(particle_space))
+            for i, cords in enumerate(particle_space):
+                dists[i] = self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1])
+                if math.isnan(dists[i]):
+                    dists[i] = 100
+
+            confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed)) # pyright: ignore[reportAssignmentType]
             
-            weight = 0.0
-            
-            if count != 0:
-                weight = confidence_sum / count
-                
+            weight = confidence_sum / len(dists)
             particle.w = weight
             
         #count_OOB = 0 archive from debugging, left in for evidence

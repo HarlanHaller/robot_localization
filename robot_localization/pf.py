@@ -82,7 +82,7 @@ class ParticleFilter(Node):
         self.occupancy_field = OccupancyField(self)
         self.transform_helper = TFHelper(self)
         
-        self.declare_parameter("n_particles_uniform", math.floor(self.n_particles*0.0))
+        self.declare_parameter("n_particles_uniform", math.floor(self.n_particles*0.15))
         #We will use every n scan points starting from 0 where n is this paramater. (for optimization)
         self.declare_parameter("scan_point_density", 2)
         
