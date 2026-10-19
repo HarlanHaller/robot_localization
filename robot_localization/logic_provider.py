@@ -104,7 +104,7 @@ class LogicProvider:
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
         sd = 0.005 # noise level
-        theta_spread = 50
+        theta_spread = 100
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
         for p in particles:
