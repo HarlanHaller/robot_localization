@@ -10,6 +10,7 @@ from std_msgs.msg import Header
 from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, TransformStamped
 from rclpy.parameter import Parameter
 import matplotlib.pyplot as plt
+import time
 
 class Particle(object):
     """ Represents a hypothesis (particle) of the robot's pose consisting of x,y and theta (yaw)
@@ -151,50 +152,52 @@ class LogicProvider:
         # print(r)
         # print(theta)
         
-        # particle = particle_cloud[10]
-        # particle_space: List[Tuple]=[]
-        # for i in range(len(r)):
-        #     if math.isinf(r[i]):
-        #         # This will make get_closest_obstacle_distance return nan instead of throwing an error
-        #         particle_space.append((10000.0, 10000.0))
-        #         continue
-        #     x_val = particle.x + math.cos(particle.theta+theta[i]) * r[i]
-        #     y_val = particle.y + math.sin(particle.theta+theta[i]) * r[i]
-        #     particle_space.append((x_val, y_val))
-        # xs = [p[0] for p in particle_space]
-        # ys = [p[1] for p in particle_space]
-        # plt.scatter(xs, ys)
-        # plt.scatter(particle.x, particle.y, c="black")
-        # plt.axis("equal")
-        # plt.savefig("test")
+        start_time = time.perf_counter()
         
+        scan_points = np.zeros((3, len(r)))
+        
+        for i in range(len(r)):
+            if math.isinf(r[i]):
+                continue
+            scan_points[0, i] = math.cos(theta[i]) * r[i]
+            scan_points[1, i] = math.sin(theta[i]) * r[i]
+            scan_points[2, i] = 1
+            
+        print(f"pre-compute: {time.perf_counter()-start_time}")
+
         for particle in particle_cloud:
             if particle.x < bounds[0][0] or particle.x > bounds[0][1] or particle.y < bounds[1][0] or particle.y > bounds[1][1]:
                 particle.w = 0.0
                 # print("OOB")
                 continue
             
-            particle_space: List[Tuple]=[]
-            for i in range(len(r)):
-                if math.isinf(r[i]):
-                    # This will make get_closest_obstacle_distance return nan instead of throwing an error
-                    particle_space.append((10000.0, 10000.0))
-                    continue
-                x_val = particle.x + math.cos(particle.theta+theta[i]) * r[i]
-                y_val = particle.y + math.sin(particle.theta+theta[i]) * r[i]
-                particle_space.append((x_val, y_val))
+            t = particle.theta
+            T = np.array([
+                [math.cos(t), -math.sin(t), particle.x],
+                [math.sin(t), math.cos(t),  particle.y],
+                [0,           0,            1]
+            ])
+            
+            particle_space = T @ scan_points
+            print(f"transform: {time.perf_counter()-start_time}")
+            
             dists = np.zeros(len(particle_space))
             for i, cords in enumerate(particle_space):
                 dists[i] = self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1])
                 if math.isnan(dists[i]):
                     dists[i] = 100
-
-            confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed)) # pyright: ignore[reportAssignmentType]
+                    
+            print(f"get dist: {time.perf_counter()-start_time}")
+            
+            confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed))
+            
+            print(f"get weight: {time.perf_counter()-start_time}")
             
             weight = confidence_sum / len(dists)
             particle.w = weight
             
         #count_OOB = 0 archive from debugging, left in for evidence
+        print(f"end: {time.perf_counter()-start_time}")
             
         return particle_cloud
 
@@ -250,3 +253,4 @@ class LogicProvider:
             particle.w = particle.w / weight_sum
 
         return particle_cloud
+
