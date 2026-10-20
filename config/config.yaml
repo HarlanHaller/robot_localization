@@ -1,0 +1,5 @@
+n_particles: 5000
+percent_particles_uniform: 0.3
+resample_noise_sd: 0.1
+resample_theta_spread: 100
+laser_gaussian_sd: 0.05 

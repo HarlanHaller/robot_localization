@@ -12,12 +12,22 @@ from test_support_classes.support_parameter import Parameter
 
 
 class TestBase:
-    def create_logic_provider(self, n_particles = 300, n_particles_uniform = 50):
+    def create_logic_provider(self, n_particles = 0, n_particles_uniform=None):
         self.occupancy_field = OccupancyField("mapdata/gauntlet.pkl")
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        yaml_path = os.path.abspath(os.path.join(file_path, 'config.yaml'))
+        with open(yaml_path) as f:
+            data = yaml.safe_load(f)
+            if n_particles == 0:
+                n_particles = data["n_particles"]
+            if n_particles_uniform == None:
+                n_particles_uniform = math.floor(n_particles*data["percent_particles_uniform"])
         self.n_particles = n_particles
         self.n_particles_uniform_param = Parameter(n_particles_uniform)
-        self.logic_provider = LogicProvider(
-            self.occupancy_field, self.n_particles, self.n_particles_uniform_param) # pyright: ignore[reportArgumentType]
+        self.logic_provider = LogicProvider(self.occupancy_field, yaml_path) # pyright: ignore[reportArgumentType]
+        self.logic_provider.n_particles = n_particles
+        self.logic_provider.n_particles_uniform = n_particles_uniform
+    
 
 
 class TestUpdateWithOdom(TestBase):

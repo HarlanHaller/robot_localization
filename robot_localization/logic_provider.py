@@ -1,6 +1,8 @@
 import math
+from typing import LiteralString
 from typing import List, Tuple
 import numpy as np
+import yaml
 from robot_localization.occupancy_field import OccupancyField
 from robot_localization.helper_functions import TFHelper, draw_random_sample
 from robot_localization.angle_helpers import quaternion_from_euler
@@ -52,18 +54,33 @@ class LogicProvider:
     def __init__(
         self,
         occupancy_field: OccupancyField,
-        n_particles: int,
-        n_particles_uniform_param: Parameter
+        config_path: LiteralString
     ):
         self.occupancy_field: OccupancyField = occupancy_field
-        self.n_particles = n_particles
-        self.n_particles_uniform_param = n_particles_uniform_param
-
+        self.config_path = config_path
+        
+        #Yaml file setup:
+        # n_particles: int
+        # percent_particles_uniform: float
+        # resample_noise_sd: float
+        # resample_theta_spread: int
+        # laser_gaussian_sd: float
+        
+        with open(config_path, "r") as f:
+            data = yaml.safe_load(f)
+            self.n_particles = data["n_particles"]
+            self.n_particles_uniform = math.floor(self.n_particles*data["percent_particles_uniform"])
+            self.resample_noise_sd = data["resample_noise_sd"]
+            self.resample_theta_spread = data["resample_theta_spread"]
+            self.laser_gaussian_sd = data["laser_gaussian_sd"]
+                    
+    
     def update_robot_pose(self, particle_cloud: List[Particle]) -> Pose | None:
         best_weight = 0.0
         best_particle = None
         # weights = [p.w for p in self.particle_cloud];
         # print(max(weights))
+        
         for particle in particle_cloud:
             if particle.w > best_weight:
                 best_particle = particle
@@ -100,18 +117,19 @@ class LogicProvider:
         return particle_cloud
 
     def resample_particles(self, particle_cloud: List[Particle]) -> List[Particle]:
-        n_particles_uniform: int = self.n_particles_uniform_param.value # type: ignore
+        n_particles_uniform: int = self.n_particles_uniform
         prob_list = [p.w for p in particle_cloud]
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-n_particles_uniform)
-        sd = 0.005 # noise level
-        theta_spread = 100
+        sd = self.resample_noise_sd # noise level
+        theta_spread = self.resample_theta_spread # paramater to vonmisesvariate, higher number = less variation
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
         for p in particles:
             noise_x = random.gauss(0, sd)
             noise_y = random.gauss(0, sd)
             t_val = random.vonmisesvariate(p.theta, theta_spread)
+            # t_val = p.theta
             p.x, p.y, p.theta = p.x+noise_x, p.y+noise_y, t_val
         for _ in range(n_particles_uniform):
             x_pos = random.uniform(bounds[0][0], bounds[0][1])
@@ -146,7 +164,7 @@ class LogicProvider:
         Calculate all the weights of particle cloud.
         """
         # Calculate the closest distance to the real robot.
-        sd = 0.01
+        sd = self.laser_gaussian_sd
         sd_preprossed = sd*sd * 2
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         # print(r)
@@ -163,7 +181,7 @@ class LogicProvider:
             scan_points[1, i] = math.sin(theta[i]) * r[i]
             scan_points[2, i] = 1
             
-        print(f"pre-compute: {time.perf_counter()-start_time}")
+        # print(f"pre-compute: {time.perf_counter()-start_time}")
 
         for particle in particle_cloud:
             if particle.x < bounds[0][0] or particle.x > bounds[0][1] or particle.y < bounds[1][0] or particle.y > bounds[1][1]:
@@ -179,25 +197,26 @@ class LogicProvider:
             ])
             
             particle_space = T @ scan_points
-            print(f"transform: {time.perf_counter()-start_time}")
+            # print(f"transform: {time.perf_counter()-start_time}")
             
-            dists = np.zeros(len(particle_space))
-            for i, cords in enumerate(particle_space):
+            
+            dists = np.zeros(particle_space.shape[1])
+            for i, cords in enumerate(particle_space.T):
                 dists[i] = self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1])
                 if math.isnan(dists[i]):
                     dists[i] = 100
                     
-            print(f"get dist: {time.perf_counter()-start_time}")
+            # print(f"get dist: {time.perf_counter()-start_time}")
             
             confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed))
             
-            print(f"get weight: {time.perf_counter()-start_time}")
+            # print(f"get weight: {time.perf_counter()-start_time}")
             
             weight = confidence_sum / len(dists)
-            particle.w = weight
+            particle.w = weight * weight
             
         #count_OOB = 0 archive from debugging, left in for evidence
-        print(f"end: {time.perf_counter()-start_time}")
+        # print(f"end: {time.perf_counter()-start_time}")
             
         return particle_cloud
 

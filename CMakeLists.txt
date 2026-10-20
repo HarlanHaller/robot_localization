@@ -37,6 +37,10 @@ install(PROGRAMS
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME})
 
+  
+install(DIRECTORY config
+  DESTINATION share/${PROJECT_NAME})
+
 ament_python_install_package(robot_localization)
 
 ament_package()

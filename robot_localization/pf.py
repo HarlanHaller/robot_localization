@@ -2,6 +2,8 @@
 
 """ This is the starter code for the robot localization project """
 
+import os
+
 import rclpy
 from threading import Thread
 from rclpy.time import Time
@@ -22,6 +24,7 @@ from rclpy.qos import qos_profile_sensor_data
 from angle_helpers import quaternion_from_euler
 import random
 from scipy.stats import truncnorm
+from ament_index_python.packages import get_package_share_directory
 
 class ParticleFilter(Node):
     """ The class that represents a Particle Filter ROS Node
@@ -86,7 +89,9 @@ class ParticleFilter(Node):
         #We will use every n scan points starting from 0 where n is this paramater. (for optimization)
         self.declare_parameter("scan_point_density", 2)
         
-        self.logic_provider = LogicProvider(self.occupancy_field, self.n_particles, self.get_parameter("n_particles_uniform")) # pyright: ignore[reportArgumentType]
+        yaml_path = os.path.join(get_package_share_directory("robot_localization"), "config", "config.yaml")
+        
+        self.logic_provider = LogicProvider(self.occupancy_field, yaml_path) # pyright: ignore[reportArgumentType]
 
         # we are using a thread to work around single threaded execution bottleneck
         thread = Thread(target=self.loop_wrapper)
@@ -291,9 +296,9 @@ class ParticleFilter(Node):
         msg = ParticleCloud()
         msg.header.frame_id = self.map_frame
         msg.header.stamp = timestamp
-        for p in self.particle_cloud:
+        for p in self.particle_cloud[::5]:
             # print(p.w)
-            msg.particles.append(Nav2Particle(pose=p.as_pose(), weight=p.w*100)) # pyright: ignore[reportAttributeAccessIssue]
+            msg.particles.append(Nav2Particle(pose=p.as_pose(), weight=p.w*1000)) # pyright: ignore[reportAttributeAccessIssue]
         self.particle_pub.publish(msg)
 
     def scan_received(self, msg):
