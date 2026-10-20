@@ -76,21 +76,38 @@ class LogicProvider:
                     
     
     def update_robot_pose(self, particle_cloud: List[Particle]) -> Pose | None:
+        """
+        Estimate the pose of the robot based on
+        the poses and weights of a particle cloud.
+
+        Args:
+            particle_cloud (list of Particles): The particles
+            to use to estimate the pose of the robot.
+        
+        Returns:
+            None: If none of the particles have weights above zero.
+            robot_pose (Pose): The position and orientation of
+            the robot pose estimate.
+        """
+        # Find the particle with the highest weight.
         best_weight = 0.0
         best_particle = None
         # weights = [p.w for p in self.particle_cloud];
         # print(max(weights))
-        
         for particle in particle_cloud:
             if particle.w > best_weight:
                 best_particle = particle
                 best_weight = particle.w
+
+        # If there are no particles with weights above zero:
         if best_particle is None:
+            # Return None.
             return
 
         #print(max(p.w for p in particle_cloud) == best_particle.w)
 
         # Set robot_pose based on the pose of the highest weighted particle.
+        # Convert from x, y and theta to a 3D position vector and a quaternion angle.
         robot_pose = Pose()
         robot_pose.position.x = best_particle.x
         robot_pose.position.y = best_particle.y
@@ -100,6 +117,7 @@ class LogicProvider:
         robot_pose.orientation.z = quaternion[2]
         robot_pose.orientation.w = quaternion[3]
 
+        # Return the estimated pose of the robot.
         return robot_pose
 
     def update_particles_with_odom(
@@ -161,7 +179,14 @@ class LogicProvider:
         self, r, theta, particle_cloud: List[Particle]
     ) -> List[Particle]:
         """
-        Calculate all the weights of particle cloud.
+        Calculate all the weights of a particle cloud.
+
+        Args:
+            r (list of floats): The distances measurements from a
+            LiDAR scanner, each index corresponding with a different angle.
+            theta (list of floats): The angles of the LiDAR scan,
+            each index lines up with r.
+            particle_cloud (list of Particles): The particles to weight.
         """
         # Calculate the closest distance to the real robot.
         sd = self.laser_gaussian_sd
@@ -169,55 +194,78 @@ class LogicProvider:
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         # print(r)
         # print(theta)
-        
-        start_time = time.perf_counter()
-        
+        #start_time = time.perf_counter()
+
+        # Project the scan points into a matrix where each column
+        # is a different scan point represented by the vector [x; y; 1]
         scan_points = np.zeros((3, len(r)))
-        
+        # For each point:
         for i in range(len(r)):
+            # Unless the distance from the robot to the point is infinite:
             if math.isinf(r[i]):
                 continue
+            # Calculate the x and y coordinate of the point in the map frame
             scan_points[0, i] = math.cos(theta[i]) * r[i]
             scan_points[1, i] = math.sin(theta[i]) * r[i]
             scan_points[2, i] = 1
-            
+
         # print(f"pre-compute: {time.perf_counter()-start_time}")
 
+        # For each particle:
         for particle in particle_cloud:
-            if particle.x < bounds[0][0] or particle.x > bounds[0][1] or particle.y < bounds[1][0] or particle.y > bounds[1][1]:
+            # If the particles is outside the bounds
+            # of the map set their weight to zero.
+            if(
+                particle.x < bounds[0][0] or
+                particle.x > bounds[0][1] or
+                particle.y < bounds[1][0] or
+                particle.y > bounds[1][1]
+            ):
                 particle.w = 0.0
                 # print("OOB")
                 continue
-            
+
+            # Otherwise:
+            # Multiply each scan point vector by a matrix that
+            # rotates and translates it from the robot frame
+            # onto the particle in the map frame as if the particle
+            # took the scan itself.
             t = particle.theta
             T = np.array([
                 [math.cos(t), -math.sin(t), particle.x],
                 [math.sin(t), math.cos(t),  particle.y],
                 [0,           0,            1]
             ])
-            
             particle_space = T @ scan_points
             # print(f"transform: {time.perf_counter()-start_time}")
-            
-            
+
+            # Calculate the distance from each projected scan point
+            # to the nearest obstacle on the map.
             dists = np.zeros(particle_space.shape[1])
             for i, cords in enumerate(particle_space.T):
                 dists[i] = self.occupancy_field.get_closest_obstacle_distance(cords[0], cords[1])
+                # If the returned value is out of bounds
+                # assume it is very far away.
                 if math.isnan(dists[i]):
                     dists[i] = 100
-                    
+
             # print(f"get dist: {time.perf_counter()-start_time}")
-            
+
+            # Scale each distance by plugging them into
+            # a gaussian probability distribution function.
             confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed))
-            
+
             # print(f"get weight: {time.perf_counter()-start_time}")
-            
+
+            # Divide the sum by the number of scan points to get the average weight.
             weight = confidence_sum / len(dists)
+            # Set that average weight to be the weight of the particle.
             particle.w = weight * weight
-            
+
         #count_OOB = 0 archive from debugging, left in for evidence
         # print(f"end: {time.perf_counter()-start_time}")
-            
+
+        # Return the particle cloud with updated weights.
         return particle_cloud
 
     def initialize_particle_cloud(self, timestamp, xy_theta=None) -> List[Particle]:
@@ -265,11 +313,16 @@ class LogicProvider:
         Returns:
             particle_cloud: A list of particles with normalized weights.
         """
+        # Calculate the sum of the current weights.
         weight_sum = sum(particle.w for particle in particle_cloud)
+
+        # If the particles are already normalized save time by not updating them.
         if abs(weight_sum - 1) < 1e-6:
             return particle_cloud
+
+        # Divide each particle weight by the sum of all the original weights.
         for particle in particle_cloud:
             particle.w = particle.w / weight_sum
 
+        # Return the updated particle cloud.
         return particle_cloud
-

@@ -303,7 +303,8 @@ class TestUpdateParticlesWithLaser(TestBase):
         """ Initialize enough variables to test with. """
         super().create_logic_provider()
         self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
-        self.theta = [i for i in range(361)]
+        deg_to_rad = math.pi / 180
+        self.theta = [i*deg_to_rad for i in range(361)]
 
         # Randomly choose the distance to the closest object to the robot
         # from 0 to 1 meters.
