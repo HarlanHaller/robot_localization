@@ -246,7 +246,10 @@ class TestInitializeParticleCloud(TestBase):
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="black", label="center")
-        plt.title("uniform dist")
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
+        plt.saveas = "%s.png" % (plt.saveas[:-4],) # saves ad png instead of pdf
+        plt.title("Initialzing With no Guess")
         plt.legend()
 
         # Check that all error values are sufficently small
@@ -288,7 +291,10 @@ class TestInitializeParticleCloud(TestBase):
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(guess[0], guess[1], c="black", label="guess")
-        plt.title("initialized with a guess")
+        plt.title("Initialized With a Guess")
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
+        plt.saveas = "%s.png" % (plt.saveas[:-4],) # saves as png isntead of pdf
         plt.legend()
 
         # Assert that the error is low
@@ -347,6 +353,9 @@ class TestResampleParticles(TestBase):
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(pos[0], pos[1], c="black", label="set point")
         plt.title("sampled on 1 weighted point")
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
+        plt.saveas = "%s.png" % (plt.saveas[:-4],) # saves ad png instead of pdf
         plt.legend()
 
         #assert that the errors are low
@@ -361,7 +370,7 @@ class TestResampleParticles(TestBase):
             plt: the plot fixture provided by pytest-plt.
             When pytest --plots is run it will generate plots
         """
-        self.create_logic_provider()
+        self.create_logic_provider(n_particles_uniform=0, n_particles=500)
         #the uniform particles are ok here because our target center is in the center of the bounds
 
         #calcualte the center point
@@ -399,9 +408,12 @@ class TestResampleParticles(TestBase):
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="purple", label="center")
-        plt.scatter([pos[0][0], pos[1][0], pos[2][0]], [pos[0][1], pos[1][1], pos[2][1]],
+        plt.scatter([pos[0][0], pos[1][0], pos[2][0]], [pos[0][1], pos[1][1], pos[2][1]], 
                     c="black", label="weighted points")
-        plt.title("sampled on 3 weighted points")
+        plt.title("Resampled From 3 Equaly Weighted Particles")
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
+        plt.saveas = "%s.png" % (plt.saveas[:-4],) # saves ad png instead of pdf
         plt.legend()
 
         # assert that the error values are low
@@ -417,7 +429,7 @@ class TestResampleParticles(TestBase):
             plt: the plot fixture provided by pytest-plt.
             When pytest --plots is run it will generate plots
         """
-        self.create_logic_provider()
+        self.create_logic_provider(n_particles_uniform=0, n_particles=500)
         # Create a list of particles
         particles = [Particle(w=0) for _ in range(10000)]
 
@@ -477,9 +489,11 @@ class TestResampleParticles(TestBase):
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(weighted_center_x, weighted_center_y, c="purple", label="weighted_center")
-        plt.scatter([p[0] for p in weighted_poses], [p[1] for p in weighted_poses],
-                    c="black", label="weighted points")
-        plt.title("sampled on 5 differently weighted points")
+        plt.scatter([p[0] for p in weighted_poses], [p[1] for p in weighted_poses], c="black", label="weighted points")
+        plt.title("Resampled From 5 Differently Weighted Particles")
+        plt.xlabel("x position (m)")
+        plt.ylabel("y position (m)")
+        plt.saveas = "%s.png" % (plt.saveas[:-4],) # saves ad png instead of pdf
         plt.legend()
         plt.axis('equal')
 
