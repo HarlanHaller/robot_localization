@@ -155,65 +155,133 @@ class TestUpdateWithOdom(TestBase):
         
 
 class TestInitializeParticleCloud(TestBase):
+    """This class groups all the tests for the initialize_particle_cloud funciton
+    """
+    
+    def angle_normalize(self, z):
+        """ convenience function to map an angle to the range [-pi,pi]
+        Copied form helper_function, avoid needing create a TFHelper object"""
+        return math.atan2(math.sin(z), math.cos(z))
+    
+    def angle_diff(self, a, b):
+        """ Calculates the difference between angle a and angle b (both should
+            be in radians) the difference is always based on the closest
+            rotation from angle a to angle b.
+            examples:
+                angle_diff(.1,.2) -> -.1
+                angle_diff(.1, 2*math.pi - .1) -> .2
+                angle_diff(.1, .2+2*math.pi) -> -.1
+            Copied form helper_function, avoid needing create a TFHelper object
+        """
+        a = self.angle_normalize(a)
+        b = self.angle_normalize(b)
+        d1 = a-b
+        d2 = 2*math.pi - math.fabs(d1)
+        if d1 > 0:
+            d2 *= -1.0
+        if math.fabs(d1) < math.fabs(d2):
+            return d1
+        else:
+            return d2
+    
+    
     def test_number(self):
+        """Tests if the particle filter initializes with the right number of particles
+        """
         self.create_logic_provider()
         
         particles = self.logic_provider.initialize_particle_cloud(0)
         assert len(particles) == self.n_particles
         
     def test_avg_uniform(self, plt):
+        """Test if the particles generated uniformly have a "center of mass" in the middle of the map.
+        Additonaly plots the points to visualy confirm that particles are distrobuted as epxected. 
+
+        Args:
+            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+        """
         self.create_logic_provider(n_particles=1000)
         particles = self.logic_provider.initialize_particle_cloud(0)
         
+        # Calculates the center of the map
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        
+        # get the x, y and theta values of generated particles
         x_vals = [p.x for p in particles]
         y_vals = [p.y for p in particles]
         theta_vals = [p.theta for p in particles]
+        
+        # Compute the averages
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
         avg_theta = sum(theta_vals) / len(theta_vals)
+        
+        # Find error to expected values
         error_x = avg_x-center[0]
         error_y = avg_y-center[1]
         error_theta = avg_theta-center[2]
         
+        # Make a plot of all the particles
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="black", label="center")
         plt.title("uniform dist")
         plt.legend()
         
+        # Check that all error values are sufficently small
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
         assert abs(error_theta) <= 0.15
         
     def test_avg_with_guess(self, plt):
+        """Test if the particles generated with a guess has a "center of mass"
+        centered around the provided guess. Additonaly plots the points to visualy 
+        confirm that particles are distrobuted as epxected. 
+        
+        Args:
+            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+        """
         self.create_logic_provider(n_particles=2000)
     
         guess = (1, -2, 0)
         
         particles = self.logic_provider.initialize_particle_cloud(0, guess)
         
+        # Get the x, y, theta values of the generated
         x_vals = [p.x for p in particles]
         y_vals = [p.y for p in particles]
-        theta_vals = [p.theta for p in particles]
+        # taking the average of theta values causes issues, instead coputer distance directly
+        theta_diff = [self.angle_diff(p.theta, guess[2]) for p in particles]
+        
+        #find the averages
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
+        avg_theta_diff = sum(theta_diff) / len(theta_diff)
+        
+        #compute the errors with the guess
         error_x = avg_x-guess[0]
         error_y = avg_y-guess[1]
         
+        # Generate the plot of particle positions
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(guess[0], guess[1], c="black", label="guess")
         plt.title("initialized with a guess")
         plt.legend()
         
+        # Assert that the error is low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
+        assert abs(avg_theta_diff) <= 0.01
 
 
 class TestResampleParticles(TestBase):
+    """This class groups all of the tests for the resample_particles method
+    """
     def test_number(self):
+        """This function ensures that after resampling the number of particles remains correct
+        """
         self.create_logic_provider()
         
         particles = self.logic_provider.initialize_particle_cloud(0)
@@ -221,39 +289,66 @@ class TestResampleParticles(TestBase):
         assert len(new_particles) == self.n_particles
         
     def test_1_weighted(self, plt):
+        """Test if the when resampling based one particle the resulting particles 
+        are centered on that particle
+
+        Args:
+            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+        """
         self.create_logic_provider(n_particles_uniform=0)
         #don't include uniform particles because they will drag the center away from the guess point
         
+        #create a list of 10k particles with wieght = 0
         particles = [Particle(w=0) for _ in range(10000)]
         pos = (1, -2)
+        
+        # initialize one particle with w=1 and a chosen position
         particles[0].w = 1
         particles[0].x = pos[0]
         particles[0].y = pos[1]
         
+        # Resample the particles
         new_particles = self.logic_provider.resample_particles(particles)
+        
+        # get the x and y values from all new particles
         x_vals = [p.x for p in new_particles]
         y_vals = [p.y for p in new_particles]
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
+        
+        #Calcualte the error values
         error_x = avg_x-pos[0]
         error_y = avg_y-pos[1]
         
+        #Generate the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(pos[0], pos[1], c="black", label="set point")
         plt.title("sampled on 1 weighted point")
         plt.legend()
         
+        #assert that the errors are low
         assert abs(error_x) <= 0.05
         assert abs(error_y) <= 0.05
         
     def test_3_weighted(self, plt):
+        """Test if when we resample with 3 equally weighted particles the resulting particles 
+        are centered at the middle of thoes 3 particles
+
+        Args:
+            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+        """
         self.create_logic_provider()
         #the uniform particles are ok here because our target center is in the center of the bounds
         
+        #calcualte the center point
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        
+        # Initialize particles
         particles = [Particle(w=0) for _ in range(10000)]
+        
+        #calcualte and set the particles to position of equal lateral triangle
         d = 0.5
         pos = ((center[0]+d, center[1]), 
                (center[0]+d*math.cos(2*math.pi/3), center[1]+d*math.sin(2*math.pi/3)), 
@@ -268,7 +363,7 @@ class TestResampleParticles(TestBase):
         particles[1].y = pos[1][1]
         particles[2].y = pos[2][1]
 
-        
+        # Resample particles and calculate the error values.
         new_particles = self.logic_provider.resample_particles(particles)
         x_vals = [p.x for p in new_particles]
         y_vals = [p.y for p in new_particles]
@@ -277,6 +372,7 @@ class TestResampleParticles(TestBase):
         error_x = avg_x-center[0]
         error_y = avg_y-center[1]
         
+        # Make the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="purple", label="center")
@@ -284,14 +380,36 @@ class TestResampleParticles(TestBase):
         plt.title("sampled on 3 weighted points")
         plt.legend()
         
+        # assert that the error values are low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
         
     def test_different_weights(self, plt):
+        """Test that if we resample with 5 particle with different weights that
+        The resulting particles are centere around the weighted average of the initial particles
+
+        Args:
+            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+        """
         self.create_logic_provider()
+        # Create a list of particles
         particles = [Particle(w=0) for _ in range(10000)]
         
         def set_weighted_points(n_points, dist, center, weights_list):
+            """returns a set of poses for a n-agon given a center point
+            and a list of weights for the particles, and the distance form 
+            the center for each particle.
+
+            Args:
+                n_points (int): the number of points (the n in the n-agon)
+                dist (float): the distance from the center point (radius of circumcircle)
+                center (Tuple[float]): A tuple (x, y) for the center point of the shape
+                weights_list (List[float]): a list of floats to be set as the weights for 
+                each particle
+
+            Returns:
+                List[Tuple]: A list of tuples for each vertex on the n-agon
+            """
             poses = []
             angle_part = 2*math.pi/n_points
             for i in range(n_points):
@@ -301,27 +419,32 @@ class TestResampleParticles(TestBase):
                 p.x, p.y = poses[i]
             return poses
         
+        # Find the center
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
+        
+        # Define paramaters for the distrobution of initial points
         n_points = 5
         dist = 0.5
         weights_list = [0.05, 0.1, 0.5, 0.25, 0.1]
+        # Calcuate positions for a pentagon of particles of different weights
         weighted_poses = set_weighted_points(n_points, dist, center, weights_list)
         
+        # resample the particles ang find average position
         new_particles = self.logic_provider.resample_particles(particles)
         x_vals = [p.x for p in new_particles]
         y_vals = [p.y for p in new_particles]
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
         
-
+        # find the expected weighted center point and the error to the expected weighted center
         weighted_center_x = sum([weighted_poses[i][0]*weights_list[i] for i in range(n_points)])
         weighted_center_y = sum([weighted_poses[i][1]*weights_list[i] for i in range(n_points)])
         
         error_x = avg_x-weighted_center_x
         error_y = avg_y-weighted_center_y
         
-        
+        # make the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(weighted_center_x, weighted_center_y, c="purple", label="weighted_center")
@@ -330,6 +453,7 @@ class TestResampleParticles(TestBase):
         plt.legend()
         plt.axis('equal')
         
+        # assert that the error is low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
             
