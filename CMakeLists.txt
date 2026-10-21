@@ -37,7 +37,7 @@ install(PROGRAMS
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME})
 
-  
+# Ensures the config yaml is accesable
 install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME})
 

@@ -12,6 +12,8 @@ from test_support_classes.support_parameter import Parameter
 
 
 class TestBase:
+    """This serves as a base for all tests which simply defines a method to initialize the logic provider.
+    """
     def create_logic_provider(self, n_particles = 0, n_particles_uniform=None):
         self.occupancy_field = OccupancyField("mapdata/gauntlet.pkl")
         file_path = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +33,17 @@ class TestBase:
 
 
 class TestUpdateWithOdom(TestBase):
+    """This class groups all the tests for the update_particles_with_odom method.
+    """
     def array_to_particles(self, arr) -> List[Particle]:
+        """This is a helper method to convert a array of colum vectors [x; y; theta] into a list of particles
+
+        Args:
+            arr (ND array): The array of particles to provide data
+
+        Returns:
+            List[Particle]: A list of particles
+        """
         particles: List[Particle] = []
         for i in range(arr.shape[1]):
             p = Particle(x = arr[0, i], y=arr[1,i], theta=arr[2,i])
@@ -39,25 +51,39 @@ class TestUpdateWithOdom(TestBase):
         return particles
     
     def particles_to_array(self, plist):
+        """This helper function converts a list of particles into a np array of colum vecotrs [x; y; theta]
+
+        Args:
+            plist (List[particles]): the list of particles to convert
+
+        Returns:
+            ND array: a array with the data from the list of particles
+        """
         arr = np.array([[p.x, p.y, p.theta] for p in plist]).T
         return arr
             
     
     
     def test_move_1p_1(self):
+        """This test tests moving a single point
+        """
         self.create_logic_provider()
         
+        # Initialize the test particle
         particles = [Particle(x = 1, y = 2, theta=(3 * math.pi / 2))]
+        # Calculate the delta
         N_start = (2, 1, math.pi / 2)
         N_end = (2, 2, math.pi / 6)
         d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        # Update the particle
         new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
         
         expected_theta = 3 * math.pi / 2 + d_t
-        
+        # compare to expected value, caluclated with matlab
         assert new_particles[0].as_tuple() == pytest.approx((1, 1, expected_theta))
         
     def test_move_1p_2(self):
+        """This test tests moving a single point"""
         self.create_logic_provider()
         
         particles = [Particle(x = 1, y = 2, theta=(0))]
@@ -71,8 +97,10 @@ class TestUpdateWithOdom(TestBase):
         assert new_particles[0].as_tuple() == pytest.approx((2, 2, expected_theta))
         
     def test_move_5p(self):
+        """This method tests moving 5 points at once. Uses data calculated with matlab"""
         self.create_logic_provider()
         
+        #Load the starting positon and expeted end positions from a yaml
         file_path = os.path.dirname(os.path.abspath(__file__))
         yaml_path = os.path.abspath(os.path.join(file_path, 'test_data.yaml'))
         
@@ -84,17 +112,25 @@ class TestUpdateWithOdom(TestBase):
         start_arr = np.array(start_arr_content)
         end_arr = np.array(end_arr_content)
         
+        # Convert the matrix of data into a list of particles
         particles = self.array_to_particles(start_arr)
 
+        # Calculates the delta values
         N_start = (2, 1, math.pi / 4)
         N_end = (2, 2, math.pi / 4)
         d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
         new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        
+        #converts the particle list back to an array for comparison
         out_array = self.particles_to_array(new_particles)
         
         assert out_array == pytest.approx(end_arr)
         
     def test_move_many(self):
+        """This method tests moving many points at once. Uses data calculated with matlab.
+        It is the same as the test with 5 particles accept for a slightly different
+        start position and more particles used.
+        """
         self.create_logic_provider()
         
         file_path = os.path.dirname(os.path.abspath(__file__))

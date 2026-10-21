@@ -33,7 +33,6 @@ class ParticleFilter(Node):
             map_frame: the name of the map coordinate frame (should be "map" in most cases)
             odom_frame: the name of the odometry coordinate frame (should be "odom" in most cases)
             scan_topic: the name of the scan topic to listen to (should be "scan" in most cases)
-            n_particles: the number of particles in the filter
             d_thresh: the amount of linear movement before triggering a filter update
             a_thresh: the amount of angular movement before triggering a filter update
             pose_listener: a subscriber that listens for new approximate pose estimates (i.e. generated through the rviz GUI)
@@ -53,8 +52,6 @@ class ParticleFilter(Node):
         self.map_frame = "map"          # the name of the map coordinate frame
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
-
-        self.n_particles = 1000          # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
@@ -85,12 +82,16 @@ class ParticleFilter(Node):
         self.occupancy_field = OccupancyField(self)
         self.transform_helper = TFHelper(self)
         
-        self.declare_parameter("n_particles_uniform", math.floor(self.n_particles*0.15))
         #We will use every n scan points starting from 0 where n is this paramater. (for optimization)
+        # This is not set in the yaml file as it is used in this class and not the logic provider. Additonaly,
+        # we do not intend to need to tweak this much.
         self.declare_parameter("scan_point_density", 2)
         
+        # Gets the path of the config yaml once it is moved to the shard directory during building.
+        # Note that the yaml is made a symbolic link so it updates in the build file without rebuilding.
         yaml_path = os.path.join(get_package_share_directory("robot_localization"), "config", "config.yaml")
         
+        #Initializes the logic provider with the yaml_path and the occupancy_field
         self.logic_provider = LogicProvider(self.occupancy_field, yaml_path) # pyright: ignore[reportArgumentType]
 
         # we are using a thread to work around single threaded execution bottleneck
@@ -218,6 +219,7 @@ class ParticleFilter(Node):
             self.current_odom_xy_theta = new_odom_xy_theta
             return
         
+        #Use the logic provider to update the particles with odom data
         self.particle_cloud = self.logic_provider.update_particles_with_odom(delta, old_odom_xy_theta, self.particle_cloud) # pyright: ignore[reportArgumentType]
 
     def resample_particles(self):
@@ -230,6 +232,7 @@ class ParticleFilter(Node):
         self.get_logger().info(" --- Resample Particle --- ")
         self.normalize_particles()
         
+        # Use the logic provided to resample our particles
         particles = self.logic_provider.resample_particles(self.particle_cloud)
             
         self.particle_cloud = particles
@@ -256,10 +259,6 @@ class ParticleFilter(Node):
         particles = self.logic_provider.update_particles_with_laser(reduced_r, reduced_theta, self.particle_cloud)
         self.particle_cloud = particles
         
-        # if count_OOB >= 50:
-        #     self.get_logger().warn(f"Number of out of bounds particles is: {count_OOB}")
-
-        # Normalize the particle weights
         self.normalize_particles()
 
     def update_initial_pose(self, msg):
@@ -282,7 +281,9 @@ class ParticleFilter(Node):
             pass
         self.particle_cloud = []
         
+        # Use the logic provider to update initialize the particle cloud.
         particles = self.logic_provider.initialize_particle_cloud(timestamp, xy_theta)
+        # Set particle cloud to new particle cloud
         self.particle_cloud = particles
                 
         self.normalize_particles()
