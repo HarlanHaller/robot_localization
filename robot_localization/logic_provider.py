@@ -1,3 +1,4 @@
+""" This file contains the Particle and LogicProvider classes. """
 import math
 from typing import LiteralString
 from typing import List, Tuple

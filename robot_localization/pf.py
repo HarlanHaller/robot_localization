@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-""" This is the starter code for the robot localization project """
+""" This file contains the particle filter Node. """
 
 import os
 
