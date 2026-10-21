@@ -336,9 +336,9 @@ class ParticleFilter(Node):
         msg.header.frame_id = self.map_frame
         msg.header.stamp = timestamp
         for p in self.particle_cloud[::5]:
-            msg.particles.append(
-                Nav2Particle(pose=p.as_pose(), weight=p.w*1000)
-            ) # pyright: ignore[reportAttributeAccessIssue]
+            msg.particles.append( # pyright: ignore[reportAttributeAccessIssue]
+                Nav2Particle(pose=p.as_pose(), weight=p.w*1000) # We multiply the weights by 1000 so differences is weight are visable
+            ) 
         self.particle_pub.publish(msg)
 
     def scan_received(self, msg):

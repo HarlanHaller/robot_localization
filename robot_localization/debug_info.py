@@ -25,8 +25,10 @@ class DebugInfo(Node):
                 weights.append(p.weight)
         # Make a simple histogram of weights
         plt.hist(weights, 25)
-        plt.title("histogram of weights")
-        plt.savefig("current_weights.png")
+        plt.title("Histogram of Weights")
+        plt.xlabel("Weight")
+        plt.ylabel("Count")
+        plt.savefig("./plots/current_weights.png")
         print("made figure")
 
 def main(args=None):

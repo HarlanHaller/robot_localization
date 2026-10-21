@@ -618,6 +618,7 @@ class TestUpdateParticlesWithLaser(TestBase):
         plt.title(f"Probability of each weight from {n} randomly generated scans")
         plt.xlabel("weights (normalized)")
         plt.ylabel(f"number found (from {n} particle clouds at different robot poses)")
+        plt.saveas = "%s.jpg" % (plt.saveas[:-4],) # saves ad jpg instead of pdf
 
 class TestNormalize(TestBase):
     """ Contains tests for LogicProvider.normalize """
