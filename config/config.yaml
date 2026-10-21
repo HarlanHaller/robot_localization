@@ -1,8 +1,8 @@
-# The paramaters for the PF
+# The parameters for the PF
 n_particles: 5000
 percent_particles_uniform: 0.3
 resample_noise_sd: 0.1
 resample_theta_spread: 100
 laser_gaussian_sd: 0.05
-paticle_init_sd: 0.5
+particle_init_sd: 0.5
 particle_init_theta_spread: 4 

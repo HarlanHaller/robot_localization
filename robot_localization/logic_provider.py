@@ -52,11 +52,11 @@ class Particle(object):
 
 
 class LogicProvider:
-    """ This class contains the implimentation for all methods that were left
-    as TODOs in the provided code. It uses entirly (almost) pure functions 
-    (there is a little internal state), that return a new obejct instead of 
+    """ This class contains the implementation for all methods that were left
+    as TODOs in the provided code. It uses entirely (almost) pure functions 
+    (there is a little internal state), that return a new object instead of 
     directly modifying the object in pf. All of this makes the code a lot easier 
-    to test using a simple pytest strucutre.
+    to test using a simple pytest structure.
     """
     def __init__(
         self,
@@ -64,40 +64,40 @@ class LogicProvider:
         config_path: LiteralString
     ):
         """Initializes a LogicProvider object, called once in the particle filter
-        and then refrenced to provide methods. All the logic provider needs is a 
-        refrence to the occupancy field to preform calculations, and config data 
+        and then referenced to provide methods. All the logic provider needs is a 
+        reference to the occupancy field to preform calculations, and config data 
         to be used in the methods. The config data is passed as a path to yaml file.
 
         Args:
-            occupancy_field (OccupancyField): The occupancy_field refrence to use. 
-            config_path (LiteralString): The path to a yaml file specifing the 
-                paramters of the pf.
+            occupancy_field (OccupancyField): The occupancy_field reference to use. 
+            config_path (LiteralString): The path to a yaml file specifying the 
+                parameters of the pf.
         """
         self.occupancy_field: OccupancyField = occupancy_field
         self.config_path = config_path
         
-        #Yaml file setup:
+        # Yaml file setup:
         # n_particles: int
         # percent_particles_uniform: float
         # resample_noise_sd: float
         # resample_theta_spread: int
         # laser_gaussian_sd: float
-        # paticle_init_sd: float
-        # particle_init_theta_spread: int 
-        
-        #loads the data from the yaml, can block threads but is functionaly so quick 
-        # it doesnt affect us
+        # particle_init_sd: float
+        # particle_init_theta_spread: int
+
+        #loads the data from the yaml, can block threads but is functionally so quick
+        # it doesn't affect us
         with open(config_path, "r") as f:
             data = yaml.safe_load(f)
             self.n_particles = data["n_particles"]
-            self.n_particles_uniform = math.floor(self.n_particles*data["percent_particles_uniform"])
+            self.n_particles_uniform = math.floor(
+                self.n_particles*data["percent_particles_uniform"])
             self.resample_noise_sd = data["resample_noise_sd"]
             self.resample_theta_spread = data["resample_theta_spread"]
             self.laser_gaussian_sd = data["laser_gaussian_sd"]
-            self.particle_init_sd = data["paticle_init_sd"]
+            self.particle_init_sd = data["particle_init_sd"]
             self.particle_init_theta_spread = data["particle_init_theta_spread"]
-                    
-    
+
     def update_robot_pose(self, particle_cloud: List[Particle]) -> Pose | None:
         """
         Estimate the pose of the robot based on
@@ -116,7 +116,6 @@ class LogicProvider:
         best_weight = 0.0
         best_particle = None
         # weights = [p.w for p in self.particle_cloud];
-        # print(max(weights))
         for particle in particle_cloud:
             if particle.w > best_weight:
                 best_particle = particle
@@ -126,8 +125,6 @@ class LogicProvider:
         if best_particle is None:
             # Return None.
             return
-
-        #print(max(p.w for p in particle_cloud) == best_particle.w)
 
         # Set robot_pose based on the pose of the highest weighted particle.
         # Convert from x, y and theta to a 3D position vector and a quaternion angle.
@@ -152,8 +149,8 @@ class LogicProvider:
         """This function returns a particle cloud updated given the transform in
         robot odometry data. The formula here was found by simplifying the matrix
         transformations applying the transform to each particle in baselink then 
-        transforming back to the map frame. This was dirived in matlab and
-        implimented here.
+        transforming back to the map frame. This was derived in matlab and
+        implemented here.
 
         Args:
             delta (Tuple): A tuple containing the provided d_x, d_y, and d_theta
@@ -161,10 +158,10 @@ class LogicProvider:
             particle_cloud (List[Particle]): The list of particles to apply the transform to
 
         Returns:
-            List[Particle]: The new list of particles tranformed to their new locations
+            List[Particle]: The new list of particles transformed to their new locations
         """
         for p in particle_cloud:
-            # simplifcation was made using difference in angles formula
+            # simplification was made using difference in angles formula
             dT = p.theta - old_odom_xy_theta[2]
             new_x = p.x + (delta[0]*math.cos(dT) - delta[1]*math.sin(dT))
             new_y = p.y + (delta[0]*math.sin(dT) + delta[1]*math.cos(dT))
@@ -173,23 +170,22 @@ class LogicProvider:
         return particle_cloud
 
     def resample_particles(self, particle_cloud: List[Particle]) -> List[Particle]:
-        """This function returns a new particle cloud with particle resmapled based
+        """This function returns a new particle cloud with particle resampled based
         on the weights of each particle in the provided list of particles. It ensures
-        an amount of particles are uniformly distrobuted to avoid particle death. 
+        an amount of particles are uniformly distributed to avoid particle death. 
         The percent of particles kept uniform is determined in the config file.
 
         Args:
             particle_cloud (List[Particle]): The list of particles to resample based of off
 
         Returns:
-            List[Particle]: The new particle cloud with resampeld particles
+            List[Particle]: The new particle cloud with resampled particles
         """
         prob_list = [p.w for p in particle_cloud]
 
         #draw new particles by weight
         particles: list[Particle] = draw_random_sample(
             particle_cloud, prob_list, self.n_particles-self.n_particles_uniform)
-
 
         bounds = self.occupancy_field.get_obstacle_bounding_box()
 
@@ -244,11 +240,8 @@ class LogicProvider:
         """
         # Calculate the closest distance to the real robot.
         sd = self.laser_gaussian_sd
-        sd_preprossed = sd*sd * 2
-        bounds = self.occupancy_field.get_obstacle_bounding_box()
-        # print(r)
-        # print(theta)
-        #start_time = time.perf_counter()
+        sd_preprocessed = sd*sd * 2
+        bounds = self.occupancy_field.get_obstacle_bounding_box()\
 
         # Project the scan points into a matrix where each column
         # is a different scan point represented by the vector [x; y; 1]
@@ -263,8 +256,6 @@ class LogicProvider:
             scan_points[1, i] = math.sin(theta[i]) * r[i]
             scan_points[2, i] = 1
 
-        # print(f"pre-compute: {time.perf_counter()-start_time}")
-
         # For each particle:
         for particle in particle_cloud:
             # If the particles is outside the bounds
@@ -276,7 +267,6 @@ class LogicProvider:
                 particle.y > bounds[1][1]
             ):
                 particle.w = 0.0
-                # print("OOB")
                 continue
 
             # Otherwise:
@@ -291,7 +281,6 @@ class LogicProvider:
                 [0,           0,            1]
             ])
             particle_space = T @ scan_points
-            # print(f"transform: {time.perf_counter()-start_time}")
 
             # Calculate the distance from each projected scan point
             # to the nearest obstacle on the map.
@@ -303,21 +292,14 @@ class LogicProvider:
                 if math.isnan(dists[i]):
                     dists[i] = 100
 
-            # print(f"get dist: {time.perf_counter()-start_time}")
-
             # Scale each distance by plugging them into
             # a gaussian probability distribution function.
-            confidence_sum = sum(self.gaussian_pdf(dists, sd_preprossed))
-
-            # print(f"get weight: {time.perf_counter()-start_time}")
+            confidence_sum = sum(self.gaussian_pdf(dists, sd_preprocessed))
 
             # Divide the sum by the number of scan points to get the average weight.
             weight = confidence_sum / len(dists)
             # Set that average weight to be the weight of the particle.
             particle.w = weight * weight
-
-        #count_OOB = 0 archive from debugging, left in for evidence
-        # print(f"end: {time.perf_counter()-start_time}")
 
         # Return the particle cloud with updated weights.
         return particle_cloud
@@ -325,23 +307,25 @@ class LogicProvider:
     def initialize_particle_cloud(self, timestamp, xy_theta=None) -> List[Particle]:
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         x_div = self.particle_init_sd #renamed to shorten lines
-        y_div = self.particle_init_sd # we currnetly use same sd for both axis but we designed for flexibility
+        y_div = self.particle_init_sd
+            # we currently use same sd for both axis but we designed for flexibility
         theta_div = self.resample_theta_spread
         particle_cloud: List[Particle] = []
 
+        # If we receive a guess particles are placed by a gaussian distribution around the guess
         if xy_theta is not None:
-            # If we recive a guess particles are placed by a guassian distrobution around the guess
-            print("guess recived")
             # get the bound of allowable x and y values in number of sd from center
             x_min_max = ((bounds[0][0] - xy_theta[0])/x_div, (bounds[0][1] - xy_theta[0])/x_div)
             y_min_max = ((bounds[1][0] - xy_theta[1])/y_div, (bounds[1][1] - xy_theta[1])/y_div)
-            # The bounds of this truncnorm are passed in z-score. We use trucnorm so the 
-            # distobution is reshaped to account for the bounds and we don't waste/ need
+            # The bounds of this truncnorm are passed in z-score. We use trucnorm so the
+            # distibution is reshaped to account for the bounds and we don't waste/ need
             # to resample particles.
             x_vals: List[int] = truncnorm.rvs(
-                x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div, size=self.n_particles) # pyright: ignore[reportAssignmentType]
+                x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div, size=self.n_particles
+                ) # pyright: ignore[reportAssignmentType]
             y_vals: List[int] = truncnorm.rvs(
-                y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div, size=self.n_particles) # pyright: ignore[reportAssignmentType]
+                y_min_max[0], y_min_max[1], loc=xy_theta[1], scale=y_div, size=self.n_particles
+                ) # pyright: ignore[reportAssignmentType]
             for i in range(self.n_particles):
                 x = x_vals[i]
                 y = y_vals[i]
@@ -349,7 +333,7 @@ class LogicProvider:
                 p = Particle(x = x, y = y, theta = t)
                 particle_cloud.append(p)
         else:
-            # If we dont recive a guess, all particle are uniformly sampled.
+            # If we dont receive a guess, all particle are uniformly sampled.
             for i in range(self.n_particles):
                 x_pos = random.uniform(bounds[0][0], bounds[0][1])
                 y_pos = random.uniform(bounds[1][0], bounds[1][1])
