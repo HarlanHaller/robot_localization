@@ -1,3 +1,4 @@
+""" Test logic_provider.py """
 import math
 import os
 import random
@@ -12,10 +13,18 @@ from test_support_classes.support_parameter import Parameter
 
 
 class TestBase:
-    """This serves as a base for all tests which simply defines a method to initialize the logic provider.
+    """
+    This serves as a base for all tests which simply
+    defines a method to initialize the logic provider.
     """
     def create_logic_provider(self, n_particles = 0, n_particles_uniform=None):
+        """
+        Initialize a LogicProvider.
+        """
+        # Set the map.
         self.occupancy_field = OccupancyField("mapdata/gauntlet.pkl")
+
+        # Set the constants from a YAML file.
         file_path = os.path.dirname(os.path.abspath(__file__))
         yaml_path = os.path.abspath(os.path.join(file_path, 'config.yaml'))
         with open(yaml_path) as f:
@@ -26,17 +35,20 @@ class TestBase:
                 n_particles_uniform = math.floor(n_particles*data["percent_particles_uniform"])
         self.n_particles = n_particles
         self.n_particles_uniform_param = Parameter(n_particles_uniform)
-        self.logic_provider = LogicProvider(self.occupancy_field, yaml_path) # pyright: ignore[reportArgumentType]
+        self.logic_provider = LogicProvider(
+            self.occupancy_field, yaml_path) # pyright: ignore[reportArgumentType]
         self.logic_provider.n_particles = n_particles
         self.logic_provider.n_particles_uniform = n_particles_uniform
-    
 
 
 class TestUpdateWithOdom(TestBase):
-    """This class groups all the tests for the update_particles_with_odom method.
+    """
+    This class groups all the tests for the update_particles_with_odom method.
     """
     def array_to_particles(self, arr) -> List[Particle]:
-        """This is a helper method to convert a array of colum vectors [x; y; theta] into a list of particles
+        """
+        This is a helper method to convert a array
+        of column vectors [x; y; theta] into a list of particles.
 
         Args:
             arr (ND array): The array of particles to provide data
@@ -49,9 +61,11 @@ class TestUpdateWithOdom(TestBase):
             p = Particle(x = arr[0, i], y=arr[1,i], theta=arr[2,i])
             particles.append(p)
         return particles
-    
+
     def particles_to_array(self, plist):
-        """This helper function converts a list of particles into a np array of colum vecotrs [x; y; theta]
+        """
+        This helper function converts a list of particles
+        into a np array of column vectors [x; y; theta]
 
         Args:
             plist (List[particles]): the list of particles to convert
@@ -61,57 +75,58 @@ class TestUpdateWithOdom(TestBase):
         """
         arr = np.array([[p.x, p.y, p.theta] for p in plist]).T
         return arr
-            
-    
-    
+
     def test_move_1p_1(self):
-        """This test tests moving a single point
+        """
+        This test tests moving a single point
         """
         self.create_logic_provider()
-        
+
         # Initialize the test particle
-        particles = [Particle(x = 1, y = 2, theta=(3 * math.pi / 2))]
+        particles = [Particle(x = 1, y = 2, theta = 3 * math.pi / 2)]
         # Calculate the delta
-        N_start = (2, 1, math.pi / 2)
-        N_end = (2, 2, math.pi / 6)
-        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
+        n_start = (2, 1, math.pi / 2)
+        n_end = (2, 2, math.pi / 6)
+        d_x, d_y, d_t = n_end[0] - n_start[0], n_end[1] - n_start[1], n_end[2] - n_start[2]
         # Update the particle
-        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
-        
+        new_particles = self.logic_provider.update_particles_with_odom(
+            (d_x, d_y, d_t), n_start, particles)
+
         expected_theta = 3 * math.pi / 2 + d_t
         # compare to expected value, caluclated with matlab
         assert new_particles[0].as_tuple() == pytest.approx((1, 1, expected_theta))
-        
+
     def test_move_1p_2(self):
         """This test tests moving a single point"""
         self.create_logic_provider()
-        
-        particles = [Particle(x = 1, y = 2, theta=(0))]
-        N_start = (2, 1, math.pi / 2)
-        N_end = (2, 2, math.pi / 6)
-        d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
-        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
-        
+
+        particles = [Particle(x = 1, y = 2, theta = 0)]
+        n_start = (2, 1, math.pi / 2)
+        n_end = (2, 2, math.pi / 6)
+        d_x, d_y, d_t = n_end[0] - n_start[0], n_end[1] - n_start[1], n_end[2] - n_start[2]
+        new_particles = self.logic_provider.update_particles_with_odom(
+            (d_x, d_y, d_t), n_start, particles)
+
         expected_theta = 0 + d_t
-        
+
         assert new_particles[0].as_tuple() == pytest.approx((2, 2, expected_theta))
-        
+
     def test_move_5p(self):
         """This method tests moving 5 points at once. Uses data calculated with matlab"""
         self.create_logic_provider()
-        
+
         #Load the starting positon and expeted end positions from a yaml
         file_path = os.path.dirname(os.path.abspath(__file__))
         yaml_path = os.path.abspath(os.path.join(file_path, 'test_data.yaml'))
-        
+
         with open(yaml_path, "r") as f:
             data = yaml.safe_load(f)
             start_arr_content = data['particles_5_start']
             end_arr_content = data['particles_5_end']
-            
+
         start_arr = np.array(start_arr_content)
         end_arr = np.array(end_arr_content)
-        
+
         # Convert the matrix of data into a list of particles
         particles = self.array_to_particles(start_arr)
 
@@ -119,28 +134,30 @@ class TestUpdateWithOdom(TestBase):
         N_start = (2, 1, math.pi / 4)
         N_end = (2, 2, math.pi / 4)
         d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
-        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
-        
+        new_particles = self.logic_provider.update_particles_with_odom(
+            (d_x, d_y, d_t), N_start, particles)
+
         #converts the particle list back to an array for comparison
         out_array = self.particles_to_array(new_particles)
-        
+
         assert out_array == pytest.approx(end_arr)
-        
+
     def test_move_many(self):
-        """This method tests moving many points at once. Uses data calculated with matlab.
+        """
+        This method tests moving many points at once. Uses data calculated with matlab.
         It is the same as the test with 5 particles accept for a slightly different
         start position and more particles used.
         """
         self.create_logic_provider()
-        
+
         file_path = os.path.dirname(os.path.abspath(__file__))
         yaml_path = os.path.abspath(os.path.join(file_path, 'test_data.yaml'))
-        
+
         with open(yaml_path, "r") as f:
             data = yaml.safe_load(f)
             start_arr_content = data['particles_many_start']
             end_arr_content = data['particles_many_end']        
-        
+
         start_arr = np.array(start_arr_content)
         end_arr = np.array(end_arr_content)
         particles = self.array_to_particles(start_arr)
@@ -148,21 +165,23 @@ class TestUpdateWithOdom(TestBase):
         N_start = (2, 1, math.pi / 6)
         N_end = (2, 2, math.pi / 4)
         d_x, d_y, d_t = N_end[0] - N_start[0], N_end[1] - N_start[1], N_end[2] - N_start[2]
-        new_particles = self.logic_provider.update_particles_with_odom((d_x, d_y, d_t), N_start, particles)
+        new_particles = self.logic_provider.update_particles_with_odom(
+            (d_x, d_y, d_t), N_start, particles)
         out_array = self.particles_to_array(new_particles)
-        
+
         assert out_array == pytest.approx(end_arr)
-        
+
 
 class TestInitializeParticleCloud(TestBase):
-    """This class groups all the tests for the initialize_particle_cloud funciton
     """
-    
+    This class groups all the tests for the initialize_particle_cloud function
+    """
+
     def angle_normalize(self, z):
         """ convenience function to map an angle to the range [-pi,pi]
         Copied form helper_function, avoid needing create a TFHelper object"""
         return math.atan2(math.sin(z), math.cos(z))
-    
+
     def angle_diff(self, a, b):
         """ Calculates the difference between angle a and angle b (both should
             be in radians) the difference is always based on the closest
@@ -183,93 +202,95 @@ class TestInitializeParticleCloud(TestBase):
             return d1
         else:
             return d2
-    
-    
+
     def test_number(self):
         """Tests if the particle filter initializes with the right number of particles
         """
         self.create_logic_provider()
-        
+
         particles = self.logic_provider.initialize_particle_cloud(0)
         assert len(particles) == self.n_particles
-        
+
     def test_avg_uniform(self, plt):
-        """Test if the particles generated uniformly have a "center of mass" in the middle of the map.
+        """
+        Test if the particles generated uniformly have a "center of mass" in the middle of the map.
         Additonaly plots the points to visualy confirm that particles are distrobuted as epxected. 
 
         Args:
-            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+            plt: the plot fixture provided by pytest-plt.
+            When pytest --plots is run it will generate plots
         """
         self.create_logic_provider(n_particles=1000)
         particles = self.logic_provider.initialize_particle_cloud(0)
-        
+
         # Calculates the center of the map
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
-        
+
         # get the x, y and theta values of generated particles
         x_vals = [p.x for p in particles]
         y_vals = [p.y for p in particles]
         theta_vals = [p.theta for p in particles]
-        
+
         # Compute the averages
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
         avg_theta = sum(theta_vals) / len(theta_vals)
-        
+
         # Find error to expected values
         error_x = avg_x-center[0]
         error_y = avg_y-center[1]
         error_theta = avg_theta-center[2]
-        
+
         # Make a plot of all the particles
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="black", label="center")
         plt.title("uniform dist")
         plt.legend()
-        
+
         # Check that all error values are sufficently small
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
         assert abs(error_theta) <= 0.15
-        
+
     def test_avg_with_guess(self, plt):
         """Test if the particles generated with a guess has a "center of mass"
         centered around the provided guess. Additonaly plots the points to visualy 
         confirm that particles are distrobuted as epxected. 
         
         Args:
-            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+            plt: the plot fixture provided by pytest-plt.
+            When pytest --plots is run it will generate plots
         """
         self.create_logic_provider(n_particles=2000)
-    
+
         guess = (1, -2, 0)
-        
+
         particles = self.logic_provider.initialize_particle_cloud(0, guess)
-        
+
         # Get the x, y, theta values of the generated
         x_vals = [p.x for p in particles]
         y_vals = [p.y for p in particles]
         # taking the average of theta values causes issues, instead coputer distance directly
         theta_diff = [self.angle_diff(p.theta, guess[2]) for p in particles]
-        
+
         #find the averages
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
         avg_theta_diff = sum(theta_diff) / len(theta_diff)
-        
+
         #compute the errors with the guess
         error_x = avg_x-guess[0]
         error_y = avg_y-guess[1]
-        
+
         # Generate the plot of particle positions
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(guess[0], guess[1], c="black", label="guess")
         plt.title("initialized with a guess")
         plt.legend()
-        
+
         # Assert that the error is low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
@@ -283,71 +304,73 @@ class TestResampleParticles(TestBase):
         """This function ensures that after resampling the number of particles remains correct
         """
         self.create_logic_provider()
-        
+
         particles = self.logic_provider.initialize_particle_cloud(0)
         new_particles = self.logic_provider.resample_particles(particles)
         assert len(new_particles) == self.n_particles
-        
+
     def test_1_weighted(self, plt):
         """Test if the when resampling based one particle the resulting particles 
         are centered on that particle
 
         Args:
-            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+            plt: the plot fixture provided by pytest-plt.
+            When pytest --plots is run it will generate plots
         """
         self.create_logic_provider(n_particles_uniform=0)
         #don't include uniform particles because they will drag the center away from the guess point
-        
+
         #create a list of 10k particles with wieght = 0
         particles = [Particle(w=0) for _ in range(10000)]
         pos = (1, -2)
-        
+
         # initialize one particle with w=1 and a chosen position
         particles[0].w = 1
         particles[0].x = pos[0]
         particles[0].y = pos[1]
-        
+
         # Resample the particles
         new_particles = self.logic_provider.resample_particles(particles)
-        
+
         # get the x and y values from all new particles
         x_vals = [p.x for p in new_particles]
         y_vals = [p.y for p in new_particles]
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
-        
+
         #Calcualte the error values
         error_x = avg_x-pos[0]
         error_y = avg_y-pos[1]
-        
+
         #Generate the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(pos[0], pos[1], c="black", label="set point")
         plt.title("sampled on 1 weighted point")
         plt.legend()
-        
+
         #assert that the errors are low
         assert abs(error_x) <= 0.05
         assert abs(error_y) <= 0.05
-        
+
     def test_3_weighted(self, plt):
         """Test if when we resample with 3 equally weighted particles the resulting particles 
         are centered at the middle of thoes 3 particles
 
         Args:
-            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+            plt: the plot fixture provided by pytest-plt.
+            When pytest --plots is run it will generate plots
         """
         self.create_logic_provider()
         #the uniform particles are ok here because our target center is in the center of the bounds
-        
+
         #calcualte the center point
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
-        
+
         # Initialize particles
         particles = [Particle(w=0) for _ in range(10000)]
-        
+
         #calcualte and set the particles to position of equal lateral triangle
         d = 0.5
         pos = ((center[0]+d, center[1]), 
@@ -371,30 +394,33 @@ class TestResampleParticles(TestBase):
         avg_y = sum(y_vals) / len(y_vals)
         error_x = avg_x-center[0]
         error_y = avg_y-center[1]
-        
+
         # Make the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(center[0], center[1], c="purple", label="center")
-        plt.scatter([pos[0][0], pos[1][0], pos[2][0]], [pos[0][1], pos[1][1], pos[2][1]], c="black", label="weighted points")
+        plt.scatter([pos[0][0], pos[1][0], pos[2][0]], [pos[0][1], pos[1][1], pos[2][1]],
+                    c="black", label="weighted points")
         plt.title("sampled on 3 weighted points")
         plt.legend()
-        
+
         # assert that the error values are low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
-        
+
     def test_different_weights(self, plt):
-        """Test that if we resample with 5 particle with different weights that
-        The resulting particles are centere around the weighted average of the initial particles
+        """
+        Test that if we resample with 5 particle with different weights that
+        The resulting particles are center around the weighted average of the initial particles
 
         Args:
-            plt: the plot fixture provided by pytest-plt. When pytest --plots is run it will generate plots
+            plt: the plot fixture provided by pytest-plt.
+            When pytest --plots is run it will generate plots
         """
         self.create_logic_provider()
         # Create a list of particles
         particles = [Particle(w=0) for _ in range(10000)]
-        
+
         def set_weighted_points(n_points, dist, center, weights_list):
             """returns a set of poses for a n-agon given a center point
             and a list of weights for the particles, and the distance form 
@@ -413,50 +439,54 @@ class TestResampleParticles(TestBase):
             poses = []
             angle_part = 2*math.pi/n_points
             for i in range(n_points):
-                poses.append((center[0]+math.cos(angle_part*i)*dist, center[1]+math.sin(angle_part*i)*dist))
+                poses.append((
+                    center[0]+math.cos(angle_part*i)*dist,
+                     center[1]+math.sin(angle_part*i)*dist
+                ))
                 p = particles[i]
                 p.w = weights_list[i]
                 p.x, p.y = poses[i]
             return poses
-        
+
         # Find the center
         bounds = self.occupancy_field.get_obstacle_bounding_box()
         center = ((bounds[0][1]+bounds[0][0])/2, (bounds[1][1]+bounds[1][0])/2, math.pi)
-        
+
         # Define paramaters for the distrobution of initial points
         n_points = 5
         dist = 0.5
         weights_list = [0.05, 0.1, 0.5, 0.25, 0.1]
         # Calcuate positions for a pentagon of particles of different weights
         weighted_poses = set_weighted_points(n_points, dist, center, weights_list)
-        
+
         # resample the particles ang find average position
         new_particles = self.logic_provider.resample_particles(particles)
         x_vals = [p.x for p in new_particles]
         y_vals = [p.y for p in new_particles]
         avg_x = sum(x_vals) / len(x_vals)
         avg_y = sum(y_vals) / len(y_vals)
-        
+
         # find the expected weighted center point and the error to the expected weighted center
         weighted_center_x = sum([weighted_poses[i][0]*weights_list[i] for i in range(n_points)])
         weighted_center_y = sum([weighted_poses[i][1]*weights_list[i] for i in range(n_points)])
-        
+
         error_x = avg_x-weighted_center_x
         error_y = avg_y-weighted_center_y
-        
+
         # make the plot
         plt.scatter(x_vals, y_vals, label = "points")
         plt.scatter(avg_x, avg_y, c="red", label="averge")
         plt.scatter(weighted_center_x, weighted_center_y, c="purple", label="weighted_center")
-        plt.scatter([p[0] for p in weighted_poses], [p[1] for p in weighted_poses], c="black", label="weighted points")
+        plt.scatter([p[0] for p in weighted_poses], [p[1] for p in weighted_poses],
+                    c="black", label="weighted points")
         plt.title("sampled on 5 differently weighted points")
         plt.legend()
         plt.axis('equal')
-        
+
         # assert that the error is low
         assert abs(error_x) <= 0.1
         assert abs(error_y) <= 0.1
-            
+
 
 class TestUpdateParticlesWithLaser(TestBase):
     """ Contains tests for LogicProvider.update_particles_with_laser """
@@ -469,7 +499,6 @@ class TestUpdateParticlesWithLaser(TestBase):
         # Make a particle cloud with uniform random poses.
         self.particle_cloud = self.logic_provider.initialize_particle_cloud(0)
 
-        
         deg_to_rad = math.pi / 180
         self.theta = [i*deg_to_rad for i in range(361)]
 
@@ -507,12 +536,12 @@ class TestUpdateParticlesWithLaser(TestBase):
         theta = [0]
 
         # Make particles that are out of bounds and one that is in bounds.
-        OOB_x_min = Particle(x=-10, y=0, theta=0)
-        OOB_x_max = Particle(x=10, y=0, theta=0)
-        OOB_y_min = Particle(x=0, y=-10, theta=0)
-        OOB_y_max = Particle(x=0, y=10, theta=0)
-        IB = Particle(x=0, y=0, theta=0)
-        p_list = [OOB_x_min, OOB_x_max, OOB_y_min, OOB_y_max, IB]
+        oob_x_min = Particle(x=-10, y=0, theta=0)
+        oob_x_max = Particle(x=10, y=0, theta=0)
+        oob_y_min = Particle(x=0, y=-10, theta=0)
+        oob_y_max = Particle(x=0, y=10, theta=0)
+        ib = Particle(x=0, y=0, theta=0)
+        p_list = [oob_x_min, oob_x_max, oob_y_min, oob_y_max, ib]
 
         # Calculate the particles' weights.
         new_particles = self.logic_provider.update_particles_with_laser(r, theta, p_list)
@@ -524,7 +553,6 @@ class TestUpdateParticlesWithLaser(TestBase):
         assert new_particles[2].w == 0
         assert new_particles[3].w == 0
         assert new_particles[4].w >= 0
-        
 
     @pytest.mark.repeat(3)
     def test_positive(self):
@@ -652,7 +680,6 @@ class TestUpdateRobotPose(TestBase):
         # Make a list of the highest weighted particles,
         # one if there is a highest more if there is a tie.
         weight_max = max(p.w for p in self.particle_cloud)
-        #print(f"{weight_max = }")
         best_list = []
         for p in self.particle_cloud:
             if p.w == weight_max:
@@ -660,7 +687,6 @@ class TestUpdateRobotPose(TestBase):
 
         # Assert that a best particle was found.
         assert len(best_list) > 0
-        #print(f"{len(best_list) = }")
 
         # For each particle in the list:
         for p in best_list:
@@ -675,21 +701,9 @@ class TestUpdateRobotPose(TestBase):
             )
             same_theta = abs((theta % (2*math.pi)) - (p.theta % (2*math.pi))) < 1e-6
 
-            #print(f"{roll = }")
-            #print(f"{pitch = }")
-            #print(f"{robot_pose.position.x = }")
-            #print(f"{p.x = }")
-            #print(f"{robot_pose.position.y = }")
-            #print(f"{p.y = }")
-            #print(f"{theta = }")
-            #print(f"{p.theta = }")
-
             # If all are the same, pass the assertion
             if same_x and same_y and same_theta:
-                #print("pass\n")
                 return
-            
-            #print("fail\n")
 
         # If a best particle that matches the robot pose hasn't been found:
         # Fail the assertion.
