@@ -579,6 +579,7 @@ class TestUpdateParticlesWithLaser(TestBase):
         weights = []
         for _ in range(n):
             self.initialize_data()
+            self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
             weights += [p.w for p in self.particle_cloud]
 
         # Sort the weights and graph them by index.
@@ -586,7 +587,7 @@ class TestUpdateParticlesWithLaser(TestBase):
         plt.plot(weights)
         plt.title(f"Weights of particles from {n} randomly generated scans")
         plt.xlabel("index (sorted)")
-        plt.ylabel("weight (not normalized)")
+        plt.ylabel("weight (normalized)")
 
     def test_histogram(self, plt):
         """ Graph the distribution of random particle weights """
@@ -595,12 +596,13 @@ class TestUpdateParticlesWithLaser(TestBase):
         weights = []
         for _ in range(n):
             self.initialize_data()
+            self.particle_cloud = self.logic_provider.normalize(self.particle_cloud)
             weights += [p.w for p in self.particle_cloud]
 
         # Make a histogram of the weights.
         plt.hist(weights, 25)
         plt.title(f"Probability of each weight from {n} randomly generated scans")
-        plt.xlabel("weights (not normalized)")
+        plt.xlabel("weights (normalized)")
         plt.ylabel(f"number found (from {n} particle clouds at different robot poses)")
 
 class TestNormalize(TestBase):
