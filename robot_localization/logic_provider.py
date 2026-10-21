@@ -318,7 +318,7 @@ class LogicProvider:
             x_min_max = ((bounds[0][0] - xy_theta[0])/x_div, (bounds[0][1] - xy_theta[0])/x_div)
             y_min_max = ((bounds[1][0] - xy_theta[1])/y_div, (bounds[1][1] - xy_theta[1])/y_div)
             # The bounds of this truncnorm are passed in z-score. We use trucnorm so the
-            # distibution is reshaped to account for the bounds and we don't waste/ need
+            # distribution is reshaped to account for the bounds and we don't waste/ need
             # to resample particles.
             x_vals: List[int] = truncnorm.rvs(
                 x_min_max[0], x_min_max[1], loc=xy_theta[0], scale=x_div, size=self.n_particles
