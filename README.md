@@ -28,7 +28,9 @@ Since we are following the captured Neato version of this assignment, when the p
 
 ### Motion update
 
-We derived the equations we used to perform the particle update in matlab as a matrix transformation. We then implemented this transformation in code. We started with one transform that would transform the change in the odom reference frame to the `base_link` frame. We then use a homogenous transform to both translate each particle by the robot's translation and rotation relative to each particle's “base\_link,” and then convert this position to the map frame using each particle's position and rotation. The matrices to do this are: INSERT LATEX HERE Combining and simplifying these transformations yields this final set of update equations, which we implemented in code: INSERT LATEX HERE
+We derived the equations we used to perform the particle update in matlab as a matrix transformation. We then implemented this transformation in code. We started with one transform that would transform the change in the odom reference frame to the `base_link` frame. We then use a homogenous transform to both translate each particle by the robot's translation and rotation relative to each particle's “base\_link,” and then convert this position to the map frame using each particle's position and rotation. The matrices to do this are: 
+
+Combining and simplifying these transformations yields this final set of update equations, which we implemented in code: INSERT LATEX HERE
 
 ### Observation update
 
