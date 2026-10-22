@@ -30,7 +30,15 @@ Since we are following the captured Neato version of this assignment, when the p
 
 We derived the equations we used to perform the particle update in matlab as a matrix transformation. We then implemented this transformation in code. We started with one transform that would transform the change in the odom reference frame to the `base_link` frame. We then use a homogenous transform to both translate each particle by the robot's translation and rotation relative to each particle's “base\_link,” and then convert this position to the map frame using each particle's position and rotation. The matrices to do this are: 
 
-Combining and simplifying these transformations yields this final set of update equations, which we implemented in code: INSERT LATEX HERE
+![latex tranform 2](assets/m_2.png)
+![latex transform 1](assets/m_1.png)
+
+where, N_heading is the heading of the neato, P_heading is the heading of the particle, and V_p is the position of the particle
+
+Combining and simplifying these transformations yields this final set of update equations, which we implemented in code:   
+$P_{new\_x}=P_x + N_{T,X}*\cos(dT)-N_{T,Y}*\sin(dT)$  
+$P_{new\_y}=P_y + N_{T,X}*\sin(dT)+N_{T,Y}*\cos(dT)$  
+where P_new is the new positon, N_t is the amount the neato moved, and dT is P_heading - N_heading
 
 ### Observation update
 
