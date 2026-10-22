@@ -36,7 +36,7 @@ We derived the equations we used to perform the particle update in matlab as a m
 where, N_heading is the heading of the neato, P_heading is the heading of the particle, and V_p is the position of the particle
 
 Combining and simplifying these transformations yields this final set of update equations, which we implemented in code:   
-![latex equation for x](assets/x_final.png)
+![latex equation for x](assets/x_final.png)  
 ![latex equation for y](assets/y_final.png)
 
 where P_new is the new positon, N_t is the amount the neato moved, and dT is P_heading - N_heading
