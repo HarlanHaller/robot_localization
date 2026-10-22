@@ -205,7 +205,7 @@ My other learning goal was to implement an algorithm that detects and keeps trac
 * Due to a variety of factors including being busy, sick, and traveling, we were not able to meet to start the project as early as we hoped. This led to having less time available to tune our particle filter. In the future we would both try to make a more concerted effort to at least meet to distribute work earlier into the project so we could do more work independently.  
 * When working with a program that is obviously either working or not, it’s less important to use unit tests for debugging as they’re only really better than a human at catching the edge cases. However, when working with something like a particle filter, which will never work perfectly, it’s much less obvious where the issue is, so unit tests are quite useful, even if they take longer to write than print statements.
 
-# **How To Run**  {#how-to-run}
+# **How To Run**
 
 1. Set up an appropriate ROS2 Jazzy workspace with the standard CompRobo instructions. Be sure to follow the instructions [here](https://comprobo26.github.io/assignments/robot_localization#installing-supporting-packages) to install dependencies for this project  
 2. Clone this repository into \<your\_ros\_workspace\>/src/robot\_localization.  
