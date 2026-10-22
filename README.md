@@ -56,7 +56,7 @@ Our original plan for weighting particles was to find the distance to, and angle
 
 Another major design decision we made was to restructure our repository to facilitate in depth testing. The main particle filter depends on threading and methods provided by ROS to a live node. This made it hard to test specific elements of the particle filter with the standard methods that are applied to most python programs. To work around this we split out all the methods we had to implement for the particle filter into a separate class we call the `logic_provider`. All the functions inside of the logic provider are kept as pure as possible, with the only internal state being a set of parameters loaded on startup that are not modified. This restructuring allows us to import this logic provider both into the particle filter and testing file to allow for easy testing of all methods with simulated data. 
 
-For most of our functions it is easy to create test data to pass into them. For example most functions expect to take in a particle cloud composed of a list of particles. We were able to generate this by moving the Particle class to the logic provider file as well and importing it into the testing file, allowing us to create fabricated particle clouds to pass in for testing. The one structure that took additional work was that of the occupancy field class. This class relies on using a service provided by a third-party map server node. However, we noticed that this class only uses the map server during the initialization, and once data is acquired the methods provided by the class are just data retained as objects within the class. To emulate this behavior in testing we generated a pickle file from the map server data and imported this data into a testing version of the class that imported the data from a file instead of relaying on the map server. A simplified version of our project structure after these changes is shown in figure 5.
+For most of our functions it is easy to create test data to pass into them. For example most functions expect to take in a particle cloud composed of a list of particles. We were able to generate this by moving the Particle class to the logic provider file as well and importing it into the testing file, allowing us to create fabricated particle clouds to pass in for testing. The one structure that took additional work was that of the occupancy field class. This class relies on using a service provided by a third-party map server node. However, we noticed that this class only uses the map server during the initialization, and once data is acquired the methods provided by the class are just data retained as objects within the class. To emulate this behavior in testing we generated a pickle file from the map server data and imported this data into a testing version of the class that imported the data from a file instead of relaying on the map server. A simplified version of our project structure after these changes is shown in Figure 5.
 
 ![ASCI art style directory](assets/structure_img.png)  
 Figure 5: A simplified diagram of the project repository annotated to show where files are imported.
@@ -120,10 +120,10 @@ We went through multiple iterations of weighting algorithms and had to tweak con
    2. This method generates a plot for visual confirmation.  
 3. `test_3_weighted`  
    1. This method tests that when resampling with 3 particles each weighted ⅓ placed in a equal-latteral triangle and all other particles weighted 0 the center of mass is on the center of the triangle  
-   2. This method generates a plot for visual confirmation, See figure 3.  
+   2. This method generates a plot for visual confirmation, See Figure 3.  
 4. `test_different_weights`  
    1. This method tests that when resampling with 5 particles placed in a pentagon around a point with different weights, that the center of the resampled particles is about the weighted average of the 5 points.  
-   2. This method generates a plot for visual confirmation, See figure 4.
+   2. This method generates a plot for visual confirmation, See Figure 4.
 
 ### Additional Debugging
 
@@ -137,7 +137,7 @@ Figure 7: Histogram of weights showing that in our filter most weights are conce
 
 ## **Experimental Design**
 
-We tested our particle filters performance in two main ways: using the gazebo simulator in the neato gauntlet world, and the pre-recorded bag file recorded on the mac first floor. We primarily used the gazebo testing method for our initial development as we were able to know where the robot actually was within the map, which made it much easier to assess filter performance. We later moved to testing on the bag file as it was exactly repeatable, and a more complicated environment. The consistency allowed us to isolate differences in performance to changed parameters, and the complexity provided greater challenge and more interesting environment to work in. The parameters used to run the particle filter for both of these tests are shown in figure 8.
+We tested our particle filters performance in two main ways: using the gazebo simulator in the neato gauntlet world, and the pre-recorded bag file recorded on the mac first floor. We primarily used the gazebo testing method for our initial development as we were able to know where the robot actually was within the map, which made it much easier to assess filter performance. We later moved to testing on the bag file as it was exactly repeatable, and a more complicated environment. The consistency allowed us to isolate differences in performance to changed parameters, and the complexity provided greater challenge and more interesting environment to work in. The parameters used to run the particle filter for both of these tests are shown in Figure 8.
 
 | Parameter | Value | Description |
 | :---- | :---- | :---- |
@@ -156,17 +156,17 @@ Figure 8: Table of parameters that control the PF, their final value, and their 
 ![GIF PF in gazebo](assets/pf_gazebo.gif)  
 Figure 9: GIF of particle filter running with gazebo simulation, run at 2x speed. This video shows our filter localizing the neato in the neato gauntlet world.
 
-As shown in figure 9, our filter performs well on the neato gauntlet world. One thing we found is that because the walls often take up most of the lidar’s FOV, this means that most of a particle's weight comes from aligning to the walls. This means that the particle often has to get to a location where obstacles within the wall take up a larger portion of the lidar points for the particle filter to collapse to a single point. A bag file recording output from our PF for a run similar to the one depicted in the gif is available on the [Github repository](https://github.com/HarlanHaller/robot_localization/tree/main/bags/pf_in_gazebo).
+As shown in Figure 9, our filter performs well on the neato gauntlet world. One thing we found is that because the walls often take up most of the lidar’s FOV, this means that most of a particle's weight comes from aligning to the walls. This means that the particle often has to get to a location where obstacles within the wall take up a larger portion of the lidar points for the particle filter to collapse to a single point. A bag file recording output from our PF for a run similar to the one depicted in the gif is available on the [Github repository](https://github.com/HarlanHaller/robot_localization/tree/main/bags/pf_in_gazebo).
 
 ### Bag file testing
 
 ![GIF pf in MAC](assets/pf_mac.gif)  
 Figure 10: GIF recording of particle filter running with bag file recording taken from the first flor of the MAC. 
 
-As seen in figure 10, our filter also performs well on the larger, more complex map of the first floor of the MAC. Note that we are not providing the particle filter an initial guess of the position of the neato. In the recording in figure 11, we are still able to collapse quickly but as shown in figure 10, this is not always the case. Occasionally we converge on an incorrect guess, to account for this and avoid particle death we assign a percentage of our particles (30%) to be uniformly distributed over the map, giving us a chance at finding the correct position. The bag file used for this test is available at `bags/macfirst_floor_take_2` in the robot localization package and online on the [Github repo](https://github.com/comprobo26/robot_localization/tree/main/bags/macfirst_floor_take_1). A bag file recording output from our particle filter for a run similar to the one depicted in the gif is available on the [Github repository](https://github.com/HarlanHaller/robot_localization/tree/main/bags/pf_in_mac).
+As seen in Figure 10, our filter also performs well on the larger, more complex map of the first floor of the MAC. Note that we are not providing the particle filter an initial guess of the position of the neato. In the recording in Figure 11, we are still able to collapse quickly but as shown in Figure 10, this is not always the case. Occasionally we converge on an incorrect guess, to account for this and avoid particle death we assign a percentage of our particles (30%) to be uniformly distributed over the map, giving us a chance at finding the correct position. The bag file used for this test is available at `bags/macfirst_floor_take_2` in the robot localization package and online on the [Github repo](https://github.com/comprobo26/robot_localization/tree/main/bags/macfirst_floor_take_1). A bag file recording output from our particle filter for a run similar to the one depicted in the gif is available on the [Github repository](https://github.com/HarlanHaller/robot_localization/tree/main/bags/pf_in_mac).
 
 ![GIF in mac with slow convergence](assets/pf_slow.gif)  
-Figure 11: GIF recording of particle filter running with bag file recording taken from the first flor of the MAC. This is run with the same parameters as figure 10 but, due to random change we converge on an incorrect guess.
+Figure 11: GIF recording of particle filter running with bag file recording taken from the first flor of the MAC. This is run with the same parameters as Figure 10 but, due to random change we converge on an incorrect guess.
 
 # **Challenges and Next Steps**
 
